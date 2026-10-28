@@ -11,6 +11,10 @@ npm test           # 규칙 테스트 (vitest)
 npm run build      # dist/index.html 한 파일로 빌드
 ```
 
+## 배포 (GitHub Pages)
+
+`main` 브랜치에 푸시하면 `.github/workflows/deploy.yml`이 테스트와 빌드를 거쳐 GitHub Pages에 올립니다. 처음 한 번 레포의 Settings → Pages → Source를 "GitHub Actions"로 설정해야 합니다.
+
 ## 구조
 
 - `src/data/molecules.ts` 화학 데이터 (이름, 화학식, 원소별 원자 수, 총원자 수, 구조 키, 안정성 설명, 출처, 상태)

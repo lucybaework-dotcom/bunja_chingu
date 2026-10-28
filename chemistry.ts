@@ -1,4 +1,4 @@
-import { ELEMENT_ORDER, USABLE, type AtomCounts, type ElementId, type Molecule } from '../data/molecules';
+import { ELEMENT_ORDER, USABLE, type AtomCounts, type ElementId, type Molecule } from './molecules';
 
 export function countsOf(elements: ElementId[]): AtomCounts {
   const c: AtomCounts = {};

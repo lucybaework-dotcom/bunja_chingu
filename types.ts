@@ -1,4 +1,4 @@
-import type { ElementId } from '../data/molecules';
+import type { ElementId } from './molecules';
 import type { MatchReason } from './recommend';
 
 export type Id = string;

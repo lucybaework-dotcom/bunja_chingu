@@ -1,6 +1,6 @@
 // 보완성 추천 (임시 규칙, 교체 가능). 분자 유효성 판정 이후에만 쓰인다.
-import { ELEMENTS, pairContent } from '../data/elements';
-import type { ElementId } from '../data/molecules';
+import { ELEMENTS, pairContent } from './elements';
+import type { ElementId } from './molecules';
 
 export const RECOMMEND_CONFIG = {
   /** 성향 축 차이(보완)에 주는 비중 */

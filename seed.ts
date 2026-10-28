@@ -1,7 +1,7 @@
 // 시연용 가상 데이터. 실제 사람이 아니다.
-import { apply, emptyState, type Command } from '../domain/engine';
-import type { ElementId } from '../data/molecules';
-import type { State } from '../domain/types';
+import { apply, emptyState, type Command } from './engine';
+import type { ElementId } from './molecules';
+import type { State } from './types';
 
 const V: [ElementId, string][] = [
   ['O', '아침형 인간, 산책 좋아해요'], ['H', '새로운 사람 만나는 거 좋아해요'],

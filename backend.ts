@@ -2,8 +2,8 @@
 // LocalBackend: 이 기기의 브라우저 저장소 + 가상 사용자로 흐름을 시연한다 (다중 사용자 서비스가 아님).
 // 실제 서비스에서는 RemoteBackend가 같은 Command를 서버에 보내고, 서버가 engine.apply와 같은 규칙을
 // 트랜잭션 안에서 원자적으로 실행해야 한다 (입장·매칭·확정·카드 지급).
-import { apply, type Command } from '../domain/engine';
-import { DomainError, type State } from '../domain/types';
+import { apply, type Command } from './engine';
+import { DomainError, type State } from './types';
 import { seedState } from './seed';
 
 export interface DispatchResult { ok: boolean; error?: string; createdId?: string; info?: string }

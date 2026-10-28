@@ -1,7 +1,7 @@
 // 상태 전이 규칙 (순수 함수). 실제 서비스에서는 같은 규칙을 서버에서 원자적으로 실행해야 한다.
-import { ELEMENTS } from '../data/elements';
-import { moleculeById, USABLE, type ElementId } from '../data/molecules';
-import { QUESTIONS, QUIZ_VERSION, scoreQuiz } from '../data/quiz';
+import { ELEMENTS } from './elements';
+import { moleculeById, USABLE, type ElementId } from './molecules';
+import { QUESTIONS, QUIZ_VERSION, scoreQuiz } from './quiz';
 import { contains, countsOf, exactMatches, hasVacancy, sameCounts, supersetCandidates, usableElements } from './chemistry';
 import { complementScore, matchReason, RECOMMEND_CONFIG } from './recommend';
 import { DomainError, type ChatPolicy, type Id, type Proposal, type Room, type State, type Visibility } from './types';

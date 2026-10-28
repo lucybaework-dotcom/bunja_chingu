@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { apply, emptyState, activeMembers, canChat, hasConflict, recruitingCommitments, findQueueGroup, type Command } from '../src/domain/engine';
-import { exactMatches, supersetCandidates, countsOf, usableElements } from '../src/domain/chemistry';
-import { MOLECULES, USABLE, isUsable, total, ELEMENT_ORDER } from '../src/data/molecules';
-import { QUESTIONS } from '../src/data/quiz';
-import type { ElementId } from '../src/data/molecules';
-import type { State } from '../src/domain/types';
-import { seedState } from '../src/backend/seed';
+import { apply, emptyState, activeMembers, canChat, hasConflict, recruitingCommitments, findQueueGroup, type Command } from './engine';
+import { exactMatches, supersetCandidates, countsOf, usableElements } from './chemistry';
+import { MOLECULES, USABLE, isUsable, total, ELEMENT_ORDER } from './molecules';
+import { QUESTIONS } from './quiz';
+import type { ElementId } from './molecules';
+import type { State } from './types';
+import { seedState } from './seed';
 
 function harness() {
   let s: State = emptyState(); let t = 1_000_000;

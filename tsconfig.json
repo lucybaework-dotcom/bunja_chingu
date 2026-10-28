@@ -4,5 +4,6 @@
     "moduleResolution": "bundler", "jsx": "react-jsx", "strict": true, "noEmit": true,
     "skipLibCheck": true, "isolatedModules": true, "noUnusedLocals": true, "types": ["vitest/globals"]
   },
-  "include": ["src", "tests"]
+  "include": ["*.ts", "*.tsx"],
+  "exclude": ["vite.config.ts", "node_modules", "dist"]
 }
