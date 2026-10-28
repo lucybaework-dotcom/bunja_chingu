@@ -30,6 +30,12 @@ export const QUESTIONS: Question[] = [
     { text: '에너지가 넘친다', points: { O: 2 } },
     { text: '취향이 확실하다', points: { Cl: 2 } },
   ] },
+  { id: 'u4', context: 'usual', text: '나를 가장 잘 나타내는 말은', options: [
+    { text: '호불호 갈려도 확실한 개성', points: { S: 2 } },
+    { text: '확 타오르는 열정, 가끔 방전', points: { P: 2 } },
+    { text: '묵묵한 실력파', points: { Si: 2 } },
+    { text: '강렬한 첫인상', points: { F: 2 } },
+  ] },
   { id: 'f1', context: 'friends', text: '처음 모인 자리에서 정적이 흐르면', options: [
     { text: '내가 먼저 아무 말이나 꺼낸다', points: { H: 2 } },
     { text: '다 같이 할 만한 걸 제안한다', points: { C: 2 } },
@@ -54,6 +60,12 @@ export const QUESTIONS: Question[] = [
     { text: '흥분이 가라앉도록 기다린다', points: { N: 2 } },
     { text: '내 의견의 이유를 분명히 말한다', points: { O: 1, Cl: 1 } },
   ] },
+  { id: 'f5', context: 'friends', text: '친구들 사이에서 내가 자주 맡는 역할은', options: [
+    { text: '분위기 메이커, 웃음 담당', points: { S: 2, H: 1 } },
+    { text: '응원단장, 다들 움직이게 함', points: { P: 2, O: 1 } },
+    { text: '해결사, 막히면 다들 나한테 옴', points: { Si: 2, C: 1 } },
+    { text: '절친 한두 명을 끝까지 챙김', points: { F: 2, N: 1 } },
+  ] },
   { id: 'w1', context: 'future', text: '친구들 사이에서 앞으로 되고 싶은 모습은', options: [
     { text: '어디서든 반가운 사람', points: { H: 2 } },
     { text: '모임을 이어 가는 사람', points: { C: 2 } },
@@ -65,6 +77,12 @@ export const QUESTIONS: Question[] = [
     { text: '같이 무언가 만드는 경험', points: { C: 2 } },
     { text: '오래 갈 친구 몇 명', points: { N: 2 } },
     { text: '나를 정확히 알아주는 사람', points: { Cl: 2 } },
+  ] },
+  { id: 'w3', context: 'future', text: '앞으로 친구들에게 듣고 싶은 말은', options: [
+    { text: '너 없으면 재미없어', points: { S: 2, H: 1 } },
+    { text: '너 덕분에 시작했어', points: { P: 2, O: 1 } },
+    { text: '너라면 믿고 맡길게', points: { Si: 2, C: 1 } },
+    { text: '넌 진짜 의리 있어', points: { F: 2, N: 1 } },
   ] },
 ];
 

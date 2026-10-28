@@ -3,7 +3,7 @@
 // 실제 서비스 전에는 담당자가 출처를 확인하고 status를 'approved'로 바꾸는 절차가 필요하다.
 // 매칭 규칙은 isUsable()만 보므로, 검수 정책이 정해지면 그 함수 하나만 바꾸면 된다.
 
-export type ElementId = 'H' | 'C' | 'N' | 'O' | 'Cl';
+export type ElementId = 'H' | 'C' | 'N' | 'O' | 'F' | 'Si' | 'P' | 'S' | 'Cl';
 export type AtomCounts = Partial<Record<ElementId, number>>;
 export type MoleculeStatus = 'approved' | 'candidate' | 'pending';
 
@@ -46,9 +46,39 @@ const RAW: Raw[] = [
   { id: 'ccl4', name: '사염화 탄소', formula: 'CCl₄', atomCounts: { C: 1, Cl: 4 }, structureKey: 'ClC(Cl)(Cl)Cl', stabilityNote: '상온에서 안정한 액체 분자.', sources: [pc(5943)], status: 'candidate' },
   { id: 'c2h4', name: '에틸렌', formula: 'C₂H₄', atomCounts: { C: 2, H: 4 }, structureKey: 'C=C', stabilityNote: '상온에서 안정한 평면 분자 기체.', sources: [pc(6325)], status: 'candidate' },
   { id: 'ch3oh', name: '메탄올', formula: 'CH₃OH', atomCounts: { C: 1, H: 4, O: 1 }, structureKey: 'CO', stabilityNote: '상온에서 안정한 액체 분자. 독성이 있음.', sources: [pc(887)], status: 'candidate' },
+  { id: 'ch3cn', name: '아세토나이트릴', formula: 'CH₃CN', atomCounts: { C: 2, H: 3, N: 1 }, structureKey: 'CC#N', stabilityNote: '상온에서 안정한 액체 분자 (용매).', sources: [pc(6342)], status: 'candidate' },
+  { id: 'c2h3cl', name: '염화 비닐', formula: 'C₂H₃Cl', atomCounts: { C: 2, H: 3, Cl: 1 }, structureKey: 'C=CCl', stabilityNote: '상온에서 존재하는 기체 분자. 독성이 있음.', sources: [pc(6338)], status: 'candidate' },
+  { id: 'h2co', name: '폼알데하이드', formula: 'H₂CO', atomCounts: { H: 2, C: 1, O: 1 }, structureKey: 'C=O', stabilityNote: '실재 분자이지만 순수한 기체는 쉽게 중합되어 안정성 기준 검토 필요.', sources: [pc(712)], status: 'pending' },
+  // 플루오린
+  { id: 'f2', name: '플루오린 분자', formula: 'F₂', atomCounts: { F: 2 }, structureKey: 'FF', stabilityNote: '상온에서 존재하는 이원자 기체. 반응성과 독성이 매우 큼.', sources: [pc(24524)], status: 'candidate' },
+  { id: 'hf', name: '플루오린화 수소', formula: 'HF', atomCounts: { H: 1, F: 1 }, structureKey: 'F', stabilityNote: '상온 부근에서 존재하는 분자. 독성·부식성이 큼.', sources: [pc(14917)], status: 'candidate' },
+  { id: 'ch3f', name: '플루오로메테인', formula: 'CH₃F', atomCounts: { C: 1, H: 3, F: 1 }, structureKey: 'CF', stabilityNote: '상온에서 안정한 기체 분자.', sources: [pc(11638)], status: 'candidate' },
+  { id: 'ch2f2', name: '다이플루오로메테인', formula: 'CH₂F₂', atomCounts: { C: 1, H: 2, F: 2 }, structureKey: 'FCF', stabilityNote: '상온에서 안정한 기체 분자 (냉매).', sources: [pc(6345)], status: 'candidate' },
+  { id: 'chf3', name: '플루오로폼', formula: 'CHF₃', atomCounts: { C: 1, H: 1, F: 3 }, structureKey: 'FC(F)F', stabilityNote: '상온에서 안정한 기체 분자.', sources: [pc(6373)], status: 'candidate' },
+  { id: 'cf4', name: '사플루오린화 탄소', formula: 'CF₄', atomCounts: { C: 1, F: 4 }, structureKey: 'FC(F)(F)F', stabilityNote: '매우 안정한 정사면체 기체 분자.', sources: [pc(6393)], status: 'candidate' },
+  { id: 'nf3', name: '삼플루오린화 질소', formula: 'NF₃', atomCounts: { N: 1, F: 3 }, structureKey: 'FN(F)F', stabilityNote: '상온에서 안정한 기체 분자.', sources: [pc(24553)], status: 'candidate' },
+  { id: 'ccl2f2', name: '다이클로로다이플루오로메테인', formula: 'CCl₂F₂', atomCounts: { C: 1, Cl: 2, F: 2 }, structureKey: 'FC(F)(Cl)Cl', stabilityNote: '상온에서 매우 안정한 기체 분자 (옛 냉매 프레온-12).', sources: [pc(6391)], status: 'candidate' },
+  { id: 'chclf2', name: '클로로다이플루오로메테인', formula: 'CHClF₂', atomCounts: { C: 1, H: 1, Cl: 1, F: 2 }, structureKey: 'FC(F)Cl', stabilityNote: '상온에서 안정한 기체 분자 (냉매).', sources: [pc(6372)], status: 'candidate' },
+  // 규소
+  { id: 'sif4', name: '사플루오린화 규소', formula: 'SiF₄', atomCounts: { Si: 1, F: 4 }, structureKey: 'F[Si](F)(F)F', stabilityNote: '건조한 조건에서 안정한 기체 분자. 습기와 반응함.', sources: [pc(24556)], status: 'candidate' },
+  { id: 'sicl4', name: '사염화 규소', formula: 'SiCl₄', atomCounts: { Si: 1, Cl: 4 }, structureKey: 'Cl[Si](Cl)(Cl)Cl', stabilityNote: '건조한 조건에서 안정한 액체 분자. 습기와 반응함.', sources: [pc(24816)], status: 'candidate' },
+  { id: 'sih4', name: '실레인', formula: 'SiH₄', atomCounts: { Si: 1, H: 4 }, structureKey: '[SiH4]', stabilityNote: '실재 분자이지만 공기 중에서 스스로 불붙을 수 있어 안정성 기준 검토 필요.', sources: [pc(23953)], status: 'pending' },
+  // 인
+  { id: 'ph3', name: '포스핀', formula: 'PH₃', atomCounts: { P: 1, H: 3 }, structureKey: 'P', stabilityNote: '상온에서 존재하는 피라미드형 기체 분자. 맹독성.', sources: [pc(24404)], status: 'candidate' },
+  { id: 'pf3', name: '삼플루오린화 인', formula: 'PF₃', atomCounts: { P: 1, F: 3 }, structureKey: 'FP(F)F', stabilityNote: '상온에서 존재하는 기체 분자.', sources: [pc(24547)], status: 'candidate' },
+  { id: 'pcl3', name: '삼염화 인', formula: 'PCl₃', atomCounts: { P: 1, Cl: 3 }, structureKey: 'ClP(Cl)Cl', stabilityNote: '건조한 조건에서 안정한 액체 분자. 물과 반응함.', sources: [pc(24387)], status: 'candidate' },
+  { id: 'pocl3', name: '옥시염화 인', formula: 'POCl₃', atomCounts: { P: 1, O: 1, Cl: 3 }, structureKey: 'O=P(Cl)(Cl)Cl', stabilityNote: '건조한 조건에서 안정한 액체 분자. 물과 반응함.', sources: [pc(24813)], status: 'candidate' },
+  { id: 'pf5', name: '오플루오린화 인', formula: 'PF₅', atomCounts: { P: 1, F: 5 }, structureKey: 'FP(F)(F)(F)F', stabilityNote: '건조한 조건에서 존재하는 삼각쌍뿔형 기체 분자.', sources: [pc(24295)], status: 'candidate' },
+  { id: 'p4', name: '백린', formula: 'P₄', atomCounts: { P: 4 }, structureKey: 'P12P3P1P23', stabilityNote: '실재 분자이지만 공기 중에서 스스로 불붙어 안정성 기준 검토 필요.', sources: [pc(123286)], status: 'pending' },
+  // 황
+  { id: 'h2s', name: '황화 수소', formula: 'H₂S', atomCounts: { H: 2, S: 1 }, structureKey: 'S', stabilityNote: '상온에서 안정한 기체 분자. 달걀 썩는 냄새, 독성.', sources: [pc(402)], status: 'candidate' },
+  { id: 'so2', name: '이산화 황', formula: 'SO₂', atomCounts: { S: 1, O: 2 }, structureKey: 'O=S=O', stabilityNote: '상온에서 안정한 굽은형 기체 분자.', sources: [pc(1119)], status: 'candidate' },
+  { id: 'cs2', name: '이황화 탄소', formula: 'CS₂', atomCounts: { C: 1, S: 2 }, structureKey: 'S=C=S', stabilityNote: '상온에서 안정한 선형 액체 분자. 인화성.', sources: [pc(6348)], status: 'candidate' },
+  { id: 'ocs', name: '황화 카보닐', formula: 'OCS', atomCounts: { O: 1, C: 1, S: 1 }, structureKey: 'O=C=S', stabilityNote: '상온에서 안정한 선형 기체 분자.', sources: [pc(10039)], status: 'candidate' },
+  { id: 'ch3sh', name: '메테인싸이올', formula: 'CH₃SH', atomCounts: { C: 1, H: 4, S: 1 }, structureKey: 'CS', stabilityNote: '상온에서 존재하는 기체 분자. 강한 냄새.', sources: [pc(878)], status: 'candidate' },
 ];
 
-export const ELEMENT_ORDER: ElementId[] = ['H', 'C', 'N', 'O', 'Cl'];
+export const ELEMENT_ORDER: ElementId[] = ['H', 'C', 'N', 'O', 'F', 'Si', 'P', 'S', 'Cl'];
 
 export function total(c: AtomCounts): number {
   return ELEMENT_ORDER.reduce((s, e) => s + (c[e] ?? 0), 0);

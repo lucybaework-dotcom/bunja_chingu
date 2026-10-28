@@ -9,6 +9,8 @@ const V: [ElementId, string][] = [
   ['C', '보드게임 모임 만들고 싶어요'], ['H', '고양이 두 마리랑 살아요'],
   ['N', '말수는 적지만 잘 들어요'], ['H', '노래방 가면 탬버린 담당'],
   ['Cl', '취향 확실한 편, 음악 추천 자신 있음'], ['N', '조용한 카페 좋아해요'],
+  ['S', '밈 수집가, 웃기는 거 자신 있어요'], ['F', '친해지면 오래 가는 스타일'],
+  ['P', '같이 뭐 하자고 먼저 말하는 편'], ['Si', '공대생, 고장 난 거 잘 고쳐요'],
 ];
 
 export function seedState(now: number): State {
@@ -27,6 +29,9 @@ export function seedState(now: number): State {
   run({ type: 'createRoom', actor: ids[6], moleculeId: 'nh3', chatPolicy: 'afterComplete' });
   run({ type: 'joinRoom', actor: ids[5], roomId: Object.keys(s.rooms).at(-1)! });
   run({ type: 'createRoom', actor: ids[8], moleculeId: 'ch2cl2', chatPolicy: 'immediate' });
+  run({ type: 'createRoom', actor: ids[10], moleculeId: 'so2', chatPolicy: 'immediate' });
+  run({ type: 'createRoom', actor: ids[11], moleculeId: 'cf4', chatPolicy: 'afterComplete' });
+  run({ type: 'createRoom', actor: ids[12], moleculeId: 'ph3', chatPolicy: 'immediate' });
   // 자동 매칭 대기 중인 질소 한 명
   run({ type: 'startAutoMatch', actor: ids[9] });
   void ids[7]; // 가상 7은 아무 방에도 없는 수소 (시연 도구에서 사용)

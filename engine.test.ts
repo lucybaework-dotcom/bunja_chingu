@@ -18,10 +18,10 @@ const allAnswers = (i = 0) => Object.fromEntries(QUESTIONS.map((q) => [q.id, i])
 
 describe('화학 카탈로그', () => {
   it('모든 사용 분자는 원자 수 2~6, 표시 화학식과 원자 수가 일치', () => {
-    const sub: Record<string, string> = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4' };
+    const sub: Record<string, string> = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6' };
     for (const m of USABLE()) {
       expect(m.totalAtoms).toBeGreaterThanOrEqual(2); expect(m.totalAtoms).toBeLessThanOrEqual(6);
-      const f = m.formula.replace(/[₀-₄]/g, (c) => sub[c]);
+      const f = m.formula.replace(/[₀-₆]/g, (c) => sub[c]);
       const parsed: Record<string, number> = {};
       for (const [, el, n] of f.matchAll(/(Cl|[A-Z][a-z]?)(\d*)/g)) parsed[el] = (parsed[el] ?? 0) + (n ? +n : 1);
       expect(parsed).toEqual(m.atomCounts);
@@ -44,6 +44,21 @@ describe('화학 카탈로그', () => {
   });
   it('사용 가능한 원소는 카탈로그에 실제로 등장하는 원소뿐', () => {
     expect(usableElements()).toEqual(ELEMENT_ORDER.filter((e) => USABLE().some((m) => m.atomCounts[e])));
+  });
+});
+
+describe('확장 원소', () => {
+  it('F, Si, P, S가 사용 원소에 포함되고 각자 분자가 있다', () => {
+    for (const e of ['F', 'Si', 'P', 'S'] as ElementId[]) expect(usableElements()).toContain(e);
+  });
+  it('모든 사용 원소는 테스트에서 주 점수(2점)를 받는 선택지가 있다', () => {
+    for (const e of usableElements()) expect(QUESTIONS.some((q) => q.options.some((o) => (o.points[e] ?? 0) >= 2))).toBe(true);
+  });
+  it('보류 분자(P₄, SiH₄, H₂CO)는 쓰이지 않는다', () => {
+    expect(exactMatches({ P: 4 })).toEqual([]); expect(exactMatches({ Si: 1, H: 4 })).toEqual([]); expect(exactMatches({ H: 2, C: 1, O: 1 })).toEqual([]);
+  });
+  it('Si 기호가 들어간 화학식도 올바른 원자 수', () => {
+    expect(exactMatches(countsOf(['Si', 'F', 'F', 'F', 'F'])).map((m) => m.id)).toEqual(['sif4']);
   });
 });
 

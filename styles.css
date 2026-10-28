@@ -18,6 +18,10 @@
   --atom-N: #2f5bd3; --atom-N-ink: #ffffff;
   --atom-O: #d23a2f; --atom-O-ink: #ffffff;
   --atom-Cl: #2f9a48; --atom-Cl-ink: #ffffff;
+  --atom-F: #8fd65a; --atom-F-ink: #17232c;
+  --atom-Si: #d9b48a; --atom-Si-ink: #17232c;
+  --atom-P: #f08a1c; --atom-P-ink: #17232c;
+  --atom-S: #ecc81c; --atom-S-ink: #17232c;
   --atom-ring: #17232c;
   --f-display: 'Do Hyeon', 'IBM Plex Sans KR', system-ui, sans-serif;
   --f-body: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
@@ -29,7 +33,7 @@
     --bg: #0f171c; --surface: #172329; --surface-2: #213139; --ink: #e6eef2; --ink-2: #9fb1bb; --line: #2f424c;
     --accent: #5fc4cc; --accent-ink: #062226; --accent-soft: #163a3f; --warn: #f0a868; --warn-soft: #3a2a19;
     --bad: #f2867e; --ok: #77c98c;
-    --atom-H: #eef2f4; --atom-C: #59626d; --atom-N: #5c84f0; --atom-O: #e5574c; --atom-Cl: #45b35f; --atom-ring: #9fb1bb;
+    --atom-H: #eef2f4; --atom-C: #59626d; --atom-N: #5c84f0; --atom-O: #e5574c; --atom-Cl: #45b35f; --atom-F: #9be36a; --atom-Si: #e2c19c; --atom-P: #f59a35; --atom-S: #f2d43a; --atom-ring: #9fb1bb;
     color-scheme: dark;
   }
 }
@@ -37,7 +41,7 @@
   --bg: #0f171c; --surface: #172329; --surface-2: #213139; --ink: #e6eef2; --ink-2: #9fb1bb; --line: #2f424c;
   --accent: #5fc4cc; --accent-ink: #062226; --accent-soft: #163a3f; --warn: #f0a868; --warn-soft: #3a2a19;
   --bad: #f2867e; --ok: #77c98c;
-  --atom-H: #eef2f4; --atom-C: #59626d; --atom-N: #5c84f0; --atom-O: #e5574c; --atom-Cl: #45b35f; --atom-ring: #9fb1bb;
+  --atom-H: #eef2f4; --atom-C: #59626d; --atom-N: #5c84f0; --atom-O: #e5574c; --atom-Cl: #45b35f; --atom-F: #9be36a; --atom-Si: #e2c19c; --atom-P: #f59a35; --atom-S: #f2d43a; --atom-ring: #9fb1bb;
   color-scheme: dark;
 }
 
@@ -96,6 +100,10 @@ p { margin: 0; }
 .atom.el-N { --c: var(--atom-N); --i: var(--atom-N-ink); }
 .atom.el-O { --c: var(--atom-O); --i: var(--atom-O-ink); }
 .atom.el-Cl { --c: var(--atom-Cl); --i: var(--atom-Cl-ink); }
+.atom.el-F { --c: var(--atom-F); --i: var(--atom-F-ink); }
+.atom.el-Si { --c: var(--atom-Si); --i: var(--atom-Si-ink); }
+.atom.el-P { --c: var(--atom-P); --i: var(--atom-P-ink); }
+.atom.el-S { --c: var(--atom-S); --i: var(--atom-S-ink); }
 .atom.empty { background: transparent; color: var(--ink-2); border-style: dashed; border-color: var(--ink-2); }
 .atom.me::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--accent); }
 
@@ -123,6 +131,7 @@ p { margin: 0; }
 .progress > div { height: 100%; background: var(--accent); transition: width .2s; }
 
 .el-tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 380px) { .el-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .el-tab { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 12px; }
 .el-tab.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .el-tab .rec { font-size: 10px; color: var(--accent); font-weight: 700; }
@@ -191,6 +200,10 @@ textarea.input { resize: vertical; }
 .pt-cell.on.el-N { --c: var(--atom-N); --i: var(--atom-N-ink); }
 .pt-cell.on.el-O { --c: var(--atom-O); --i: var(--atom-O-ink); }
 .pt-cell.on.el-Cl { --c: var(--atom-Cl); --i: var(--atom-Cl-ink); }
+.pt-cell.on.el-F { --c: var(--atom-F); --i: var(--atom-F-ink); }
+.pt-cell.on.el-Si { --c: var(--atom-Si); --i: var(--atom-Si-ink); }
+.pt-cell.on.el-P { --c: var(--atom-P); --i: var(--atom-P-ink); }
+.pt-cell.on.el-S { --c: var(--atom-S); --i: var(--atom-S-ink); }
 .pt-cell.sel { outline: 3px solid var(--accent); outline-offset: 1px; }
 .pt-cell.big { width: 56px; flex: none; cursor: default; }
 .pt-key { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1px dashed var(--ink-2); }
