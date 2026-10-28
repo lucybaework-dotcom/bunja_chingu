@@ -68,25 +68,22 @@ const key = (a: ElementId, b: ElementId) => [a, b].sort().join('-');
 
 const PAIRS: Record<string, PairContent[]> = {
   [key('H', 'O')]: [
-    { kind: 'clash', title: '폭명기의 기억', body: '둘 다 에너지가 높아서 처음엔 서로의 속도에 불꽃이 튈 수 있어요.', chemistryContext: '수소 기체(H₂)와 산소 기체(O₂)를 섞고 불꽃을 대면 격렬하게 반응한다. 이건 홑원소 물질끼리의 반응이다.' },
-    { kind: 'complement', title: '물이 되는 사이', body: '수소가 대화를 열고 산소가 방향을 잡으면 가장 편안한 조합이 돼요.', chemistryContext: '반응이 끝나 만들어진 물(H₂O) 안의 O–H 결합은 매우 안정하다.' },
+    { kind: 'complement', title: '물이 되는 사이', body: '수소가 대화를 열고 산소가 방향을 잡으면 가장 편안한 조합이 돼요.', chemistryContext: '물(H₂O) 안의 O–H 결합은 매우 안정하다.' },
   ],
   [key('H', 'Cl')]: [
-    { kind: 'clash', title: '빛 한 줄기에도', body: '가벼운 수소와 기준이 뚜렷한 염소는 사소한 말에도 부딪힐 수 있어요.', chemistryContext: 'H₂와 Cl₂ 혼합 기체는 강한 빛을 받으면 폭발적으로 반응한다. 홑원소 물질끼리의 반응이다.' },
-    { kind: 'complement', title: '선명한 한 쌍', body: '염소가 정리하고 수소가 부드럽게 전하면 결정이 빨라져요.', chemistryContext: '만들어진 HCl 분자 안의 H–Cl 결합은 안정한 공유 결합이다.' },
+    { kind: 'complement', title: '선명한 한 쌍', body: '염소가 정리하고 수소가 부드럽게 전하면 결정이 빨라져요.', chemistryContext: 'HCl 분자 안의 H–Cl 결합은 안정한 공유 결합이다.' },
   ],
   [key('C', 'O')]: [
-    { kind: 'clash', title: '불이 붙는 순간', body: '판을 짜는 탄소와 밀어붙이는 산소는 주도권을 두고 뜨거워질 수 있어요.', chemistryContext: '탄소가 산소 속에서 타는 연소 반응은 많은 열을 낸다. 원소와 홑원소 물질의 반응이다.' },
-    { kind: 'complement', title: '이중결합 두 개', body: '탄소의 구조와 산소의 추진력이 맞물리면 오래 가는 균형이 생겨요.', chemistryContext: '연소 결과 만들어진 CO₂ 안의 C=O 결합은 안정하다.' },
+    { kind: 'complement', title: '이중결합 두 개', body: '탄소의 구조와 산소의 추진력이 맞물리면 오래 가는 균형이 생겨요.', chemistryContext: 'CO₂ 안의 C=O 결합은 안정하다.' },
   ],
   [key('C', 'H')]: [
     { kind: 'complement', title: '모든 유기물의 시작', body: '탄소가 뼈대를 세우고 수소가 빈 곳을 채우면 무엇이든 만들 수 있어요.', chemistryContext: 'C–H 결합은 메테인처럼 유기 분자의 기본 결합이다.' },
   ],
   [key('N', 'H')]: [
-    { kind: 'complement', title: '천천히 녹아드는 사이', body: '수소의 가벼움이 질소의 벽을 낮추고, 질소는 수소에게 쉴 곳이 돼요.', chemistryContext: '암모니아(NH₃) 안의 N–H 결합. 다만 N₂와 H₂를 반응시키려면 높은 온도·압력과 촉매가 필요하다.' },
+    { kind: 'complement', title: '천천히 녹아드는 사이', body: '수소의 가벼움이 질소의 벽을 낮추고, 질소는 수소에게 쉴 곳이 돼요.', chemistryContext: '암모니아(NH₃) 안의 N–H 결합.' },
   ],
   [key('N', 'O')]: [
-    { kind: 'complement', title: '들뜸과 차분함', body: '산소가 들뜰 때 질소가 균형을 잡아 줘요. 서로의 속도를 배우는 조합.', chemistryContext: '공기는 N₂와 O₂가 섞여 있어도 상온에서 거의 반응하지 않는 혼합물이다. 분자 N₂O 안에서는 결합을 이룬다.' },
+    { kind: 'complement', title: '들뜸과 차분함', body: '산소가 들뜰 때 질소가 균형을 잡아 줘요. 서로의 속도를 배우는 조합.', chemistryContext: 'N₂O 분자 안에서 질소와 산소가 결합을 이룬다.' },
   ],
   [key('C', 'Cl')]: [
     { kind: 'complement', title: '단단한 용매', body: '탄소의 구조에 염소의 기준이 더해지면 쉽게 흔들리지 않는 모임이 돼요.', chemistryContext: 'CCl₄, CH₂Cl₂ 같은 분자 안의 C–Cl 결합.' },

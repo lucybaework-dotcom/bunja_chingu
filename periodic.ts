@@ -12,7 +12,7 @@ export const PERIODIC: PtCell[] = [
   { z: 8, symbol: 'O', name: '산소', period: 2, group: 16, note: '' },
   { z: 9, symbol: 'F', name: '플루오린', period: 2, group: 17, note: '시범 카탈로그에 아직 분자가 없어요. 검토 후 추가될 수 있어요.' },
   { z: 10, symbol: 'Ne', name: '네온', period: 2, group: 18, note: '비활성 기체라 분자를 만들지 않아요.' },
-  { z: 11, symbol: 'Na', name: '소듐', period: 3, group: 1, note: '염화 소듐(NaCl) 같은 염·결정을 만들어 독립 분자로 다루지 않아요. 물과의 격렬한 반응은 세계관 이야기로만 등장해요.' },
+  { z: 11, symbol: 'Na', name: '소듐', period: 3, group: 1, note: '염화 소듐(NaCl) 같은 염·결정을 만들어 독립 분자로 다루지 않아요.' },
   { z: 12, symbol: 'Mg', name: '마그네슘', period: 3, group: 2, note: '주로 이온 결정을 만들어 지금의 분자 규칙에 맞지 않아요.' },
   { z: 13, symbol: 'Al', name: '알루미늄', period: 3, group: 13, note: '주로 금속·이온 결정이어서 지금의 분자 규칙에 맞지 않아요.' },
   { z: 14, symbol: 'Si', name: '규소', period: 3, group: 14, note: '시범 카탈로그에 아직 분자가 없어요. 검토 후 추가될 수 있어요.' },
