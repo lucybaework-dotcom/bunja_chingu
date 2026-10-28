@@ -129,7 +129,7 @@ describe('1. 원소 테스트와 확정', () => {
   });
 });
 
-describe('2~4. 방 입장과 완성, 채팅 정책', () => {
+describe('2~4. 실험실 입장과 완성, 채팅 정책', () => {
   it('자리 없는 원소는 못 들어가고 빈자리 초과도 불가, 마지막 자리에서 자동 확정', () => {
     const h = harness();
     const o = h.user('O'), h1 = h.user('H'), h2 = h.user('H'), h3 = h.user('H'), c = h.user('C');
@@ -142,9 +142,9 @@ describe('2~4. 방 입장과 완성, 채팅 정책', () => {
     h.run({ type: 'joinRoom', actor: h2, roomId: r });
     expect(h.s.rooms[r].recruitment).toBe('complete');
     expect(canChat(h.s, r, o)).toBe(true);
-    expect(h.tryRun({ type: 'joinRoom', actor: h3, roomId: r })).toMatch(/모집 중인 방이 아니에요/);
+    expect(h.tryRun({ type: 'joinRoom', actor: h3, roomId: r })).toMatch(/모집 중인 실험실이 아니에요/);
   });
-  it('내 원소가 없는 분자로는 방을 만들 수 없다', () => {
+  it('내 원소가 없는 분자로는 실험실을 만들 수 없다', () => {
     const h = harness(); const n = h.user('N');
     expect(h.tryRun({ type: 'createRoom', actor: n, moleculeId: 'h2o', chatPolicy: 'immediate' })).toMatch(/자리가 없어요/);
     expect(h.tryRun({ type: 'createRoom', actor: n, moleculeId: 'o3', chatPolicy: 'immediate' })).toMatch(/사용할 수 없는/);
@@ -165,13 +165,13 @@ describe('2~4. 방 입장과 완성, 채팅 정책', () => {
 });
 
 describe('5. 자동 매칭', () => {
-  it('기존 모집방 빈자리를 먼저 채운다', () => {
+  it('기존 모집 중인 실험실 빈자리를 먼저 채운다', () => {
     const h = harness(); const o = h.user('O'), hh = h.user('H');
     const r = h.run({ type: 'createRoom', actor: o, moleculeId: 'h2o', chatPolicy: 'afterComplete' }).createdId!;
     const res = h.run({ type: 'startAutoMatch', actor: hh });
     expect(res.info).toBe('joined'); expect(res.createdId).toBe(r);
   });
-  it('방이 없으면 대기 → 유효 조합 생성, 가장 오래 기다린 사람이 방장, 즉시 채팅', () => {
+  it('실험실이 없으면 대기 → 유효 조합 생성, 가장 오래 기다린 사람이 방장, 즉시 채팅', () => {
     const h = harness(); const a = h.user('H'), o = h.user('O'), b = h.user('H');
     expect(h.run({ type: 'startAutoMatch', actor: a }).info).toBe('queued');
     expect(h.run({ type: 'startAutoMatch', actor: o }).info).toBe('queued'); // H+O는 카탈로그에 없음
@@ -201,7 +201,7 @@ describe('5. 자동 매칭', () => {
 });
 
 describe('6. 참여 제한', () => {
-  it('모집방은 하나만, 완성방은 여러 개', () => {
+  it('모집 중인 실험실은 하나만, 완성방은 여러 개', () => {
     const h = harness(); const me = h.user('H');
     const o1 = h.user('O'), o2 = h.user('O'), x = h.user('H'), y = h.user('H');
     const r1 = h.run({ type: 'createRoom', actor: o1, moleculeId: 'h2o', chatPolicy: 'immediate' }).createdId!;
@@ -234,7 +234,7 @@ describe('7~8. 조기 완성, 목표 변경, 마감', () => {
     expect(supersetCandidates(countsOf(['C', 'H']), 'ch4').map((m) => m.id)).toContain('c2h2');
     void c; void a; void hh2; void late;
   });
-  it('H₂O 목표 방에서 H 두 명만 모이면 H₂로 조기 완성 가능 (반대 시 무산)', () => {
+  it('H₂O 목표 실험실에서 H 두 명만 모이면 H₂로 조기 완성 가능 (반대 시 무산)', () => {
     const h = harness(); const a = h.user('H'), b = h.user('H');
     const r = h.run({ type: 'createRoom', actor: a, moleculeId: 'h2o', chatPolicy: 'immediate' }).createdId!;
     h.run({ type: 'joinRoom', actor: b, roomId: r });
@@ -294,7 +294,7 @@ describe('9. 이탈', () => {
     expect(p.targetMoleculeId).toBe('h2'); expect(p.electorate.sort()).toEqual([a, b].sort());
     expect(h.s.members.filter((m) => m.roomId === r).length).toBe(3); // 이탈 이력 유지
   });
-  it('재모집 시 다른 모집방과 충돌하면 알리고, 선택해서 해소', () => {
+  it('재모집 시 다른 모집 중인 실험실과 충돌하면 알리고, 선택해서 해소', () => {
     const h = harness(); const o = h.user('O'), a = h.user('H'), b = h.user('H'), n = h.user('N');
     const r = h.run({ type: 'createRoom', actor: o, moleculeId: 'h2o', chatPolicy: 'immediate' }).createdId!;
     h.run({ type: 'joinRoom', actor: a, roomId: r }); h.run({ type: 'joinRoom', actor: b, roomId: r });
@@ -306,7 +306,7 @@ describe('9. 이탈', () => {
     expect(h.tryRun({ type: 'startAutoMatch', actor: a })).toBeTruthy();
     h.run({ type: 'resolveConflict', actor: a, keepRoomId: r });
     expect(hasConflict(h.s, a)).toBe(false);
-    expect(activeMembers(h.s, r).some((m) => m.userId === a)).toBe(true); // 기존 방 유지
+    expect(activeMembers(h.s, r).some((m) => m.userId === a)).toBe(true); // 기존 실험실 유지
   });
 });
 
@@ -343,7 +343,7 @@ describe('10~12. 만남 확인과 카드', () => {
     const before = [h.s.cards.length, h.s.records.length];
     h.run({ type: 'respondMeeting', actor: h4, meetingId: m, response: 'confirm' });
     expect([h.s.cards.length, h.s.records.length]).toEqual(before);
-    // 첫 만남 이후 이탈해도 방 유지, 재모집 없음
+    // 첫 만남 이후 이탈해도 실험실 유지, 재모집 없음
     h.run({ type: 'leaveRoom', actor: o, roomId: r });
     expect(h.s.rooms[r].recruitment).toBe('complete'); expect(h.s.rooms[r].closedAt).toBeNull();
   });
@@ -387,7 +387,7 @@ describe('10~12. 만남 확인과 카드', () => {
     const b0 = h.s.records.find((x) => x.userId !== a)!;
     h.run({ type: 'updateIntro', actor: a, intro: '바뀐 소개' });
     expect(h.s.records.find((x) => x.id === b0.id)!.companions[0].intro).toBe('첫 소개');
-    // 방 종료해도 카드 유지
+    // 실험실 종료해도 카드 유지
     h.run({ type: 'closeRoom', actor: a, roomId: rooms[0] });
     expect(h.s.cards.filter((c) => c.userId === a).length).toBe(1);
   });
@@ -409,7 +409,7 @@ describe('13. 공개 설정', () => {
   });
 });
 
-describe('권한: 방 종료', () => {
+describe('권한: 실험실 종료', () => {
   it('방장만 종료', () => {
     const h = harness(); const a = h.user('H'), b = h.user('H');
     const r = h.run({ type: 'createRoom', actor: a, moleculeId: 'h2', chatPolicy: 'immediate' }).createdId!;

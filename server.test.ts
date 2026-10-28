@@ -36,14 +36,14 @@ describe('서버 처리', () => {
     expect((await f.call('bad', { action: 'view' })).status).toBe(401);
   });
 
-  it('두 사용자가 같은 방에서 실제로 만나 카드를 받는다', async () => {
+  it('두 사용자가 같은 실험실에서 실제로 만나 카드를 받는다', async () => {
     const f = fakeServer();
     await onboard(f, 'tok-a', 'H'); await onboard(f, 'tok-b', 'H');
     const r = await f.d('tok-a', { type: 'createRoom', moleculeId: 'h2', chatPolicy: 'immediate' });
     expect(r.ok).toBe(true);
     const bView = (await f.call('tok-b', { action: 'view' })).body.view as State;
     expect(Object.keys(bView.rooms)).toContain(r.createdId);
-    expect(bView.messages.length).toBe(0); // 남의 방 채팅은 안 보임
+    expect(bView.messages.length).toBe(0); // 남의 실험실 채팅은 안 보임
     await f.d('tok-b', { type: 'joinRoom', roomId: r.createdId });
     await f.d('tok-b', { type: 'sendMessage', roomId: r.createdId, body: '안녕!' });
     const aView = (await f.call('tok-a', { action: 'view' })).body.view as State;

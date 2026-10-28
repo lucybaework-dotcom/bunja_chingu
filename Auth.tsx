@@ -38,7 +38,7 @@ export default function AuthGate() {
   if (session === undefined) return <Center>불러오는 중…</Center>;
   if (!session) return <Login />;
   if (loadErr) return <Center><p>{loadErr}</p><button className="btn" onClick={() => location.reload()}>다시 시도</button></Center>;
-  if (!backend) return <Center>내 분자방을 불러오는 중…</Center>;
+  if (!backend) return <Center>내 실험실을 불러오는 중…</Center>;
   return <App backend={backend} />;
 }
 

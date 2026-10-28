@@ -99,7 +99,7 @@ function Screen() {
 function TabBar() {
   const { view, go } = useApp();
   const items: [View['k'][], string, 'home' | 'search' | 'table' | 'cards' | 'user', View][] = [
-    [['home', 'auto'], '홈', 'home', { k: 'home' }], [['rooms', 'create', 'room'], '분자방', 'search', { k: 'rooms' }],
+    [['home', 'auto'], '홈', 'home', { k: 'home' }], [['rooms', 'create', 'room'], '실험실', 'search', { k: 'rooms' }],
     [['table', 'element'], '주기율표', 'table', { k: 'table' }],
     [['collection', 'card', 'public'], '컬렉션', 'cards', { k: 'collection' }], [['profile'], '내 정보', 'user', { k: 'profile' }],
   ];
@@ -156,7 +156,7 @@ function Intro({ onStart }: { onStart: () => void }) {
       <div className="stack">
         {[
           ['1', '나의 원소 찾기', '테스트로 추천을 받고, 원소 설명을 비교해서 직접 골라요. 한 번 확정하면 바꿀 수 없어요.'],
-          ['2', '분자방에 모이기', '물(H₂O)이라면 수소 두 명과 산소 한 명. 실제 분자의 자리에 맞춰 방을 찾거나 자동 매칭해요.'],
+          ['2', '실험실에 모이기', '물(H₂O)이라면 수소 두 명과 산소 한 명. 실제 분자의 자리에 맞춰 실험실을 찾거나 자동 매칭해요.'],
           ['3', '만나고 카드 모으기', '실제로 만난 사람들의 구성이 진짜 분자라면 그 분자 카드를 받아요.'],
         ].map(([n, t, d]) => (
           <div key={n} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', gap: 12 }}>
@@ -274,7 +274,7 @@ function Choose({ onRetake }: { onRetake: () => void }) {
           <h2>{j(ELEMENTS[sel].name, '을/를')} 내 원소로 확정할까요?</h2>
           <p className="small">확정하면 계정을 유지하는 동안 원소를 바꿀 수 없어요. 바꾸려면 탈퇴 후 다시 가입해야 해요.</p>
           <label className="stack-s" htmlFor="intro-in">
-            <span className="small" style={{ fontWeight: 600 }}>한 줄 소개 (방에서 원소와 함께 이것만 보여요)</span>
+            <span className="small" style={{ fontWeight: 600 }}>한 줄 소개 (실험실에서 원소와 함께 이것만 보여요)</span>
             <input id="intro-in" className="input" maxLength={INTRO_MAX} value={intro} onChange={(e) => setIntro(e.target.value)} placeholder="예: 조용한 카페에서 수다 떠는 거 좋아해요" />
             <span className="small muted mono">{intro.length}/{INTRO_MAX}</span>
           </label>
@@ -316,24 +316,24 @@ function Home() {
       </div>
       {conflict && (
         <div className="panel warn">
-          <h3>모집방이 두 곳 겹쳐 있어요</h3>
-          <p className="small">첫 만남 전에 다시 모집을 시작한 방이 있어요. 모집 중인 방은 한 곳만 남길 수 있어요. 남길 방을 골라 주세요. 고르지 않은 방에서는 나가게 돼요.</p>
+          <h3>모집 중인 실험실이 두 곳 겹쳐 있어요</h3>
+          <p className="small">첫 만남 전에 다시 모집을 시작한 실험실이 있어요. 모집 중인 실험실은 한 곳만 남길 수 있어요. 남길 실험실을 골라 주세요. 고르지 않은 실험실에서는 나가게 돼요.</p>
           {commit.rooms.map((rid) => (
-            <button key={rid} className="btn block" onClick={() => run({ type: 'resolveConflict', actor: viewer, keepRoomId: rid }, '한 곳만 남겼어요.')}>{molName(s.rooms[rid].targetMoleculeId)} 방에 남기</button>
+            <button key={rid} className="btn block" onClick={() => run({ type: 'resolveConflict', actor: viewer, keepRoomId: rid }, '한 곳만 남겼어요.')}>{molName(s.rooms[rid].targetMoleculeId)} 실험실에 남기</button>
           ))}
         </div>
       )}
       <div className="stack-s">
         <button className="btn primary block" disabled={busy} onClick={auto}>자동 매칭 시작</button>
-        <button className="btn block" onClick={() => go({ k: 'rooms' })}>분자방 직접 찾기</button>
+        <button className="btn block" onClick={() => go({ k: 'rooms' })}>실험실 직접 찾기</button>
         {commit.queued && <button className="btn ghost block" onClick={() => go({ k: 'auto' })}>자동 매칭 대기 중 · 상태 보기</button>}
-        {!commit.queued && commit.rooms.length > 0 && !conflict && <p className="small muted">모집 중인 방이 있어서 새 모집에 참여할 수 없어요. 모집방은 한 곳만 참여할 수 있어요.</p>}
+        {!commit.queued && commit.rooms.length > 0 && !conflict && <p className="small muted">모집 중인 실험실이 있어서 새 모집에 참여할 수 없어요. 모집 중인 실험실은 한 곳만 참여할 수 있어요.</p>}
       </div>
       <section className="stack">
-        <div className="section-title"><h2>참여 중인 방</h2><span className="mono small muted">{myRooms.length}</span></div>
-        {myRooms.length === 0 && <div className="panel flat"><p className="muted small">아직 들어간 방이 없어요. 자동 매칭을 시작하거나 방을 찾아보세요.</p></div>}
+        <div className="section-title"><h2>참여 중인 실험실</h2><span className="mono small muted">{myRooms.length}</span></div>
+        {myRooms.length === 0 && <div className="panel flat"><p className="muted small">아직 들어간 실험실이 없어요. 자동 매칭을 시작하거나 실험실을 찾아보세요.</p></div>}
         {myRooms.map((r) => <RoomCard key={r.id} room={r} compact />)}
-        {pastRooms.length > 0 && <p className="small muted">종료됐거나 나온 방 {pastRooms.length}곳은 내 정보에서 볼 수 있어요.</p>}
+        {pastRooms.length > 0 && <p className="small muted">종료됐거나 나온 실험실 {pastRooms.length}곳은 내 정보에서 볼 수 있어요.</p>}
       </section>
       <button className="btn ghost block" onClick={() => go({ k: 'collection' })}>내 분자 컬렉션 · 카드 {s.cards.filter((c) => c.userId === viewer).length}장</button>
     </div>
@@ -354,13 +354,14 @@ function RoomCard({ room, compact }: { room: Room; compact?: boolean }) {
         <MolTitle id={room.targetMoleculeId} />
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <span className={`chip ${st.cls}`}>{st.label}</span>
+          {compact && isMember(s, room.id, viewer) && unreadCount(s, viewer, room.id) > 0 && <span className="chip on">새 메시지 {unreadCount(s, viewer, room.id)}</span>}
           {!compact && isRecruitingOpen(room) && <span className={`chip ${canIn ? 'on' : ''}`}>{canIn ? `${ELEMENTS[me.elementId!].name} 자리 있음` : '내 자리 없음'}</span>}
         </div>
       </div>
       <MoleculeStrip formula={m.formula} target={m.atomCounts} members={mems} meId={viewer} size={32} />
       <div className="row small muted">
         <span className="mono">{mems.length}/{m.totalAtoms}명</span><span>·</span>
-        <span>{room.origin === 'automatic' ? '자동 매칭 방 · 바로 채팅' : room.chatPolicy === 'immediate' ? '입장하면 바로 채팅' : '완성되면 채팅'}</span>
+        <span>{room.origin === 'automatic' ? '자동 매칭 실험실 · 바로 채팅' : room.chatPolicy === 'immediate' ? '입장하면 바로 채팅' : '완성되면 채팅'}</span>
         {room.originalMoleculeId !== room.targetMoleculeId && <><span>·</span><span>처음 목표 {moleculeById(room.originalMoleculeId)!.formula}</span></>}
       </div>
       {!compact && (
@@ -374,7 +375,7 @@ function RoomCard({ room, compact }: { room: Room; compact?: boolean }) {
   );
 }
 
-// ───────── 5. 분자방 목록 ─────────
+// ───────── 5. 실험실 목록 ─────────
 function RoomsList() {
   const { s, viewer, go } = useApp();
   const [tab, setTab] = useState<'mine' | 'all'>('mine');
@@ -384,18 +385,18 @@ function RoomsList() {
   const el = s.users[viewer].elementId!;
   return (
     <div className="stack">
-      <div className="row between"><h1>분자방</h1><button className="btn primary sm" onClick={() => go({ k: 'create' })}>새 방 만들기</button></div>
+      <div className="row between"><h1>실험실</h1><button className="btn primary sm" onClick={() => go({ k: 'create' })}>새 실험실 열기</button></div>
       <div className="seg" role="tablist">
-        <button role="tab" aria-selected={tab === 'mine'} className={tab === 'mine' ? 'on' : ''} onClick={() => setTab('mine')}>{ELEMENTS[el].name} 자리 있는 방 {joinable.length}</button>
+        <button role="tab" aria-selected={tab === 'mine'} className={tab === 'mine' ? 'on' : ''} onClick={() => setTab('mine')}>{ELEMENTS[el].name} 자리 있는 실험실 {joinable.length}</button>
         <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>모집 중 전체 {all.length}</button>
       </div>
-      {list.length === 0 && <div className="panel flat"><p className="small muted">지금은 {tab === 'mine' ? `${ELEMENTS[el].name} 자리가 남은 방이 없어요. 새 방을 만들거나 자동 매칭으로 기다려 보세요.` : '모집 중인 방이 없어요.'}</p></div>}
+      {list.length === 0 && <div className="panel flat"><p className="small muted">지금은 {tab === 'mine' ? `${ELEMENTS[el].name} 자리가 남은 실험실이 없어요. 새 실험실을 만들거나 자동 매칭으로 기다려 보세요.` : '모집 중인 실험실이 없어요.'}</p></div>}
       {list.map((r) => <RoomCard key={r.id} room={r} />)}
     </div>
   );
 }
 
-// ───────── 6. 방 만들기 ─────────
+// ───────── 6. 실험실 만들기 ─────────
 function CreateRoom() {
   const { s, viewer, run, go } = useApp();
   const el = s.users[viewer].elementId!;
@@ -406,7 +407,7 @@ function CreateRoom() {
   const groups = [...new Set(cands.map((m) => m.totalAtoms))];
   return (
     <div className="stack" style={{ gap: 18 }}>
-      <button className="back" onClick={() => go({ k: 'rooms' })}>← 분자방</button>
+      <button className="back" onClick={() => go({ k: 'rooms' })}>← 실험실</button>
       <h1>어떤 분자를 만들까요?</h1>
       <p className="small muted">이온 결정은 결정 속 화학식 단위의 원자 수만큼 모여요. 예를 들어 소금 NaCl은 2명이에요.</p>
       <p className="small muted">{j(ELEMENTS[el].name, '이/가')} 들어갈 수 있는 분자만 보여요. 나는 방장으로 원자 한 자리를 차지해요.</p>
@@ -441,8 +442,8 @@ function CreateRoom() {
           {[1, 2, 3, 5, 7].map((d) => <option key={d} value={d}>{d}일</option>)}
         </select>
       </section>
-      <button className="btn primary block" disabled={!mol} onClick={async () => { const r = await run({ type: 'createRoom', actor: viewer, moleculeId: mol, chatPolicy: policy, recruitDays: days }, '방을 만들었어요.'); if (r.ok) go({ k: 'room', id: r.createdId! }); }}>
-        {mol && moleculeById(mol)!.formula} 방 만들기
+      <button className="btn primary block" disabled={!mol} onClick={async () => { const r = await run({ type: 'createRoom', actor: viewer, moleculeId: mol, chatPolicy: policy, recruitDays: days }, '실험실을 만들었어요.'); if (r.ok) go({ k: 'room', id: r.createdId! }); }}>
+        {mol && moleculeById(mol)!.formula} 실험실 만들기
       </button>
     </div>
   );
@@ -468,7 +469,7 @@ function AutoMatch() {
     <div className="stack" style={{ gap: 20, alignItems: 'center', textAlign: 'center', paddingTop: 24 }}>
       <span className="pulse"><Atom el={el} size={88} /></span>
       <h1>결합할 원자를 찾는 중</h1>
-      <p className="muted">{ELEMENTS[el].name} 자리가 있는 모집방이 아직 없어서 대기열에 들어갔어요. 함께 기다리는 사람들로 실제 분자가 만들어지면 바로 방이 열리고 알려 드려요.</p>
+      <p className="muted">{ELEMENTS[el].name} 자리가 있는 모집 중인 실험실이 아직 없어서 대기열에 들어갔어요. 함께 기다리는 사람들로 실제 분자가 만들어지면 바로 실험실이 열리고 알려 드려요.</p>
       <div className="row small muted" style={{ justifyContent: 'center' }}><span className="mono">대기 {waiting}명</span><span>·</span><span>{fmtTime(q.enteredAt)}부터</span></div>
       <button className="btn danger" onClick={async () => { const r = await run({ type: 'cancelAutoMatch', actor: viewer }, '매칭을 취소했어요.'); if (r.ok) go({ k: 'home' }); }}>매칭 취소</button>
       {backend.mode === 'demo' && <p className="small muted">시연 도구에서 가상 사용자를 대기열에 넣어 매칭을 확인할 수 있어요.</p>}
@@ -476,12 +477,12 @@ function AutoMatch() {
   );
 }
 
-// ───────── 8~9. 방 상세 ─────────
+// ───────── 8~9. 실험실 상세 ─────────
 function RoomDetail({ id }: { id: string }) {
   const { s, viewer, run, go } = useApp();
   const r = s.rooms[id];
   const [confirmLeave, setConfirmLeave] = useState<'' | 'leave' | 'close'>('');
-  if (!r) return <p>방을 찾을 수 없어요.</p>;
+  if (!r) return <p>실험실을 찾을 수 없어요.</p>;
   const m = moleculeById(r.targetMoleculeId)!;
   const mems = activeMembers(s, id);
   const member = isMember(s, id, viewer);
@@ -490,15 +491,15 @@ function RoomDetail({ id }: { id: string }) {
   const vac = vacancies(m.atomCounts, roomCounts(s, id));
   const myMem = mems.find((x) => x.userId === viewer);
   const blocked = recruitingCommitments(s, viewer);
-  const join = () => run({ type: 'joinRoom', actor: viewer, roomId: id }, '방에 합류했어요.');
+  const join = () => run({ type: 'joinRoom', actor: viewer, roomId: id }, '실험실에 합류했어요.');
   return (
     <div className="stack" style={{ gap: 16 }}>
-      <button className="back" onClick={() => go({ k: member ? 'home' : 'rooms' })}>← {member ? '홈' : '분자방'}</button>
+      <button className="back" onClick={() => go({ k: member ? 'home' : 'rooms' })}>← {member ? '홈' : '실험실'}</button>
       <div className="row between" style={{ alignItems: 'flex-start' }}>
         <MolTitle id={r.targetMoleculeId} big />
         <div className="stack-s" style={{ alignItems: 'flex-end' }}>
           <span className={`chip ${st.cls}`}>{st.label}</span>
-          {r.origin === 'automatic' && <span className="chip">자동 매칭 방</span>}
+          {r.origin === 'automatic' && <span className="chip">자동 매칭 실험실</span>}
         </div>
       </div>
       {r.originalMoleculeId !== r.targetMoleculeId && <p className="small muted">처음 목표는 {molName(r.originalMoleculeId)}였어요.</p>}
@@ -532,34 +533,34 @@ function RoomDetail({ id }: { id: string }) {
         {!member && isRecruitingOpen(r) && (
           (vac[me.elementId!] ?? 0) > 0
             ? <button className="btn primary block" disabled={blocked.rooms.length > 0 || blocked.queued} onClick={join}>{ELEMENTS[me.elementId!].name} 자리로 합류</button>
-            : <p className="small muted">이 방에는 {ELEMENTS[me.elementId!].name} 자리가 없어요.</p>
+            : <p className="small muted">이 실험실에는 {ELEMENTS[me.elementId!].name} 자리가 없어요.</p>
         )}
         {!member && isRecruitingOpen(r) && (blocked.rooms.length > 0 || blocked.queued) && (vac[me.elementId!] ?? 0) > 0 && (
-          <p className="small muted">{blocked.queued ? '자동 매칭 대기 중이라 직접 합류할 수 없어요.' : '이미 다른 모집방에 있어요. 모집방은 한 곳만 참여할 수 있어요.'}</p>
+          <p className="small muted">{blocked.queued ? '자동 매칭 대기 중이라 직접 합류할 수 없어요.' : '이미 다른 모집 중인 실험실에 있어요. 모집 중인 실험실은 한 곳만 참여할 수 있어요.'}</p>
         )}
       </div>
 
       {member && <Proposals room={r} />}
       {member && <MeetingPanel key={`${viewer}:${mems.map((x) => x.userId).join(',')}`} room={r} />}
-      {(member || r.closedAt) && <Chat room={r} />}
+      {member && <ChatButton room={r} />}
 
       {member && !r.closedAt && (
         <div className="stack-s">
           {confirmLeave === '' && (
             <div className="row">
-              <button className="btn danger grow" onClick={() => setConfirmLeave('leave')}>방 나가기</button>
-              {r.hostId === viewer && <button className="btn danger grow" onClick={() => setConfirmLeave('close')}>방 종료</button>}
+              <button className="btn danger grow" onClick={() => setConfirmLeave('leave')}>실험실 나가기</button>
+              {r.hostId === viewer && <button className="btn danger grow" onClick={() => setConfirmLeave('close')}>실험실 종료</button>}
             </div>
           )}
           {confirmLeave !== '' && (
             <div className="panel warn">
               <p className="small">{confirmLeave === 'leave'
-                ? (r.firstMeetingConfirmedAt ? '나가도 남은 사람들의 방은 그대로 유지돼요.' : r.recruitment === 'complete' ? '첫 만남 전이라 내가 나가면 이 방은 빈자리를 다시 모집해요.' : '나가면 내 자리가 빈자리로 돌아가요.')
-                : '방을 종료하면 채팅과 모집이 모두 끝나요. 이미 얻은 카드와 만남 기록은 그대로 남아요.'}</p>
+                ? (r.firstMeetingConfirmedAt ? '나가도 남은 사람들의 실험실은 그대로 유지돼요.' : r.recruitment === 'complete' ? '첫 만남 전이라 내가 나가면 이 실험실은 빈자리를 다시 모집해요.' : '나가면 내 자리가 빈자리로 돌아가요.')
+                : '실험실을 종료하면 채팅과 모집이 모두 끝나요. 이미 얻은 카드와 만남 기록은 그대로 남아요.'}</p>
               <div className="row">
                 <button className="btn ghost" onClick={() => setConfirmLeave('')}>취소</button>
                 <button className="btn danger grow" onClick={async () => {
-                  const ok = await (confirmLeave === 'leave' ? run({ type: 'leaveRoom', actor: viewer, roomId: id }, '방에서 나왔어요.') : run({ type: 'closeRoom', actor: viewer, roomId: id }, '방을 종료했어요.'));
+                  const ok = await (confirmLeave === 'leave' ? run({ type: 'leaveRoom', actor: viewer, roomId: id }, '실험실에서 나왔어요.') : run({ type: 'closeRoom', actor: viewer, roomId: id }, '실험실을 종료했어요.'));
                   setConfirmLeave(''); if (ok.ok && confirmLeave === 'leave') go({ k: 'home' });
                 }}>{confirmLeave === 'leave' ? '나가기' : '종료하기'}</button>
               </div>
@@ -588,7 +589,7 @@ function Proposals({ room }: { room: Room }) {
           <p className="small">{p.type === 'earlyComplete'
             ? `지금 모인 구성 그대로 ${j(molName(p.targetMoleculeId), '으로/로')} 확정해요.`
             : `목표를 ${j(molName(p.targetMoleculeId), '으로/로')} 바꾸고 남은 자리를 더 모집해요. 지금 있는 사람은 아무도 빠지지 않아요.`}
-            {p.reason === 'deadline' && ' 한 명이라도 반대하면 방이 종료돼요.'}</p>
+            {p.reason === 'deadline' && ' 한 명이라도 반대하면 실험실이 종료돼요.'}</p>
           <div className="stack-s">
             {p.electorate.map((uid) => {
               const mm = s.members.find((x) => x.roomId === room.id && x.userId === uid)!;
@@ -688,34 +689,69 @@ function MeetingPanel({ room }: { room: Room }) {
   );
 }
 
-function Chat({ room }: { room: Room }) {
+const seenKey = (uid: string, roomId: string) => `bunja-seen-${uid}-${roomId}`;
+function readSeen(uid: string, roomId: string): number { try { return Number(localStorage.getItem(seenKey(uid, roomId)) ?? 0); } catch { return 0; } }
+function writeSeen(uid: string, roomId: string, t: number) { try { localStorage.setItem(seenKey(uid, roomId), String(t)); } catch { /* 저장 불가 시 무시 */ } }
+
+/** 읽지 않은 다른 사람의 메시지 수 (이 기기 기준) */
+export function unreadCount(s: State, uid: string, roomId: string): number {
+  const seen = readSeen(uid, roomId);
+  return s.messages.filter((m) => m.roomId === roomId && m.senderId && m.senderId !== uid && m.createdAt > seen).length;
+}
+
+function ChatButton({ room }: { room: Room }) {
+  const { s, viewer } = useApp();
+  const [open, setOpen] = useState(false);
+  const unread = open ? 0 : unreadCount(s, viewer, room.id);
+  return (
+    <>
+      <button className="chat-fab" onClick={() => setOpen(true)} aria-label={`실험실 채팅 열기${unread ? `, 새 메시지 ${unread}개` : ''}`}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /><path d="M8 9.5h8M8 12.5h5" /></svg>
+        <span>채팅</span>
+        {unread > 0 && <span className="chat-badge mono">{unread > 99 ? '99+' : unread}</span>}
+      </button>
+      {open && <ChatSheet room={room} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function ChatSheet({ room, onClose }: { room: Room; onClose: () => void }) {
   const { s, viewer, run } = useApp();
   const [txt, setTxt] = useState('');
   const ref = useRef<HTMLDivElement>(null);
   const msgs = s.messages.filter((m) => m.roomId === room.id);
-  useEffect(() => { ref.current?.scrollTo({ top: ref.current.scrollHeight }); }, [msgs.length]);
+  const lastT = msgs.at(-1)?.createdAt ?? 0;
+  useEffect(() => { ref.current?.scrollTo({ top: ref.current.scrollHeight }); writeSeen(viewer, room.id, lastT); }, [msgs.length, lastT, viewer, room.id]);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
   const ok = canChat(s, room.id, viewer);
   const elOf = (uid: string) => s.members.find((m) => m.roomId === room.id && m.userId === uid)?.elementSnapshot ?? 'H';
-  const reason = room.closedAt ? '종료된 방이에요.' : !isMember(s, room.id, viewer) ? '구성원만 채팅할 수 있어요.' : '분자가 완성되면 채팅이 열려요.';
+  const reason = room.closedAt ? '종료된 실험실이라 읽기만 할 수 있어요.' : '분자가 완성되면 채팅이 열려요.';
+  const m = moleculeById(room.targetMoleculeId)!;
   return (
-    <div className="panel">
-      <div className="section-title"><h3>방 채팅</h3><span className="small muted">개인 채팅·친구 추가는 없어요</span></div>
-      <div className="chat" ref={ref}>
-        {msgs.map((m) => m.senderId === null ? (
-          <div key={m.id} className="msg sys"><div className="bubble">{m.body}</div></div>
-        ) : (
-          <div key={m.id} className={`msg${m.senderId === viewer ? ' mine' : ''}`}>
-            {m.senderId !== viewer && <Atom el={elOf(m.senderId)} size={26} />}
-            <div className="bubble"><span>{m.body}</span><br /><span className="small muted mono">{fmtTime(m.createdAt)}</span></div>
-          </div>
-        ))}
+    <div className="sheet-bg" onClick={onClose}>
+      <div className="sheet chat-sheet" role="dialog" aria-label={`${m.name} 실험실 채팅`} onClick={(e) => e.stopPropagation()}>
+        <div className="row between">
+          <div className="stack-s" style={{ gap: 0 }}><h2><Formula f={m.formula} className="mono" /> 실험실 채팅</h2><span className="small muted">개인 채팅·친구 추가는 없어요</span></div>
+          <button className="btn sm" onClick={onClose}>닫기</button>
+        </div>
+        <div className="chat grow" ref={ref}>
+          {msgs.length === 0 && <p className="small muted" style={{ textAlign: 'center' }}>아직 메시지가 없어요.</p>}
+          {msgs.map((x) => x.senderId === null ? (
+            <div key={x.id} className="msg sys"><div className="bubble">{x.body}</div></div>
+          ) : (
+            <div key={x.id} className={`msg${x.senderId === viewer ? ' mine' : ''}`}>
+              {x.senderId !== viewer && <Atom el={elOf(x.senderId)} size={26} />}
+              <div className="bubble"><span>{x.body}</span><br /><span className="small muted mono">{fmtTime(x.createdAt)}</span></div>
+            </div>
+          ))}
+        </div>
+        {ok ? (
+          <form className="composer" onSubmit={async (e) => { e.preventDefault(); const r = await run({ type: 'sendMessage', actor: viewer, roomId: room.id, body: txt }); if (r.ok) setTxt(''); }}>
+            <input id={`chat-${room.id}`} className="input" value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="메시지 보내기" aria-label="메시지" autoFocus />
+            <button className="btn primary" disabled={!txt.trim()}>보내기</button>
+          </form>
+        ) : <p className="small muted">{reason}</p>}
       </div>
-      {ok ? (
-        <form className="composer" onSubmit={async (e) => { e.preventDefault(); const r = await run({ type: 'sendMessage', actor: viewer, roomId: room.id, body: txt }); if (r.ok) setTxt(''); }}>
-          <input id={`chat-${room.id}`} className="input" value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="메시지 보내기" aria-label="메시지" />
-          <button className="btn primary" disabled={!txt.trim()}>보내기</button>
-        </form>
-      ) : <p className="small muted">{reason}</p>}
     </div>
   );
 }
@@ -734,7 +770,7 @@ function Collection() {
         <button className={tab === 'nocard' ? 'on' : ''} onClick={() => setTab('nocard')}>카드 없는 만남 {nocard.length}</button>
       </div>
       {tab === 'cards' && (cards.length === 0
-        ? <div className="panel flat"><p className="small muted">아직 카드가 없어요. 분자방에서 만나고 참석자 모두 확인하면 그 구성의 분자 카드를 받아요.</p></div>
+        ? <div className="panel flat"><p className="small muted">아직 카드가 없어요. 실험실에서 만나고 참석자 모두 확인하면 그 구성의 분자 카드를 받아요.</p></div>
         : <div className="cards">{cards.map((c) => {
             const m = moleculeById(c.moleculeId)!; const n = s.records.filter((r) => r.userId === viewer && r.moleculeId === c.moleculeId).length;
             return (
@@ -758,7 +794,7 @@ function RecordRow({ recId }: { recId: string }) {
   const r = s.records.find((x) => x.id === recId)!;
   return (
     <div className="panel" style={{ gap: 8 }}>
-      <div className="row between"><span className="small mono">{fmtDate(r.createdAt)}</span><span className="small muted">방 목표 {moleculeById(r.targetMoleculeId)!.formula}</span></div>
+      <div className="row between"><span className="small mono">{fmtDate(r.createdAt)}</span><span className="small muted">실험실 목표 {moleculeById(r.targetMoleculeId)!.formula}</span></div>
       <div className="stack-s">
         {r.companions.map((c, i) => <div key={i} className="row small" style={{ flexWrap: 'nowrap' }}><Atom el={c.element} size={20} /><span className="grow">{c.intro}</span></div>)}
       </div>
@@ -852,7 +888,7 @@ function Profile() {
         <p className="small muted">이미 남은 만남 기록에는 그때의 소개가 유지돼요.</p>
       </form>
       <section className="stack-s">
-        <h2>참여한 방</h2>
+        <h2>참여한 실험실</h2>
         {rooms.length === 0 && <p className="small muted">아직 없어요.</p>}
         {rooms.map((r) => {
           const st = roomStatus(r); const left = !isMember(s, r.id, viewer);
@@ -919,7 +955,7 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
 
         {r && (
           <div className="panel">
-            <h3>지금 보는 방: {moleculeById(r.targetMoleculeId)!.formula}</h3>
+            <h3>지금 보는 실험실: {moleculeById(r.targetMoleculeId)!.formula}</h3>
             <div className="stack-s">
               <button className="btn block" disabled={!isRecruitingOpen(r)} onClick={fillOne}>빈자리 하나를 가상 사용자로 채우기</button>
               <button className="btn block" disabled={!isRecruitingOpen(r) || !!p} onClick={() => run({ type: 'expireRecruitment', roomId: r.id }, '모집 기한이 끝난 상황을 만들었어요.')}>모집 기한 끝내기</button>
@@ -945,7 +981,7 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
 
         <div className="panel">
           {!confirmReset ? <button className="btn danger block" onClick={() => setConfirmReset(true)}>시연 데이터 처음으로</button> : (
-            <div className="stack-s"><p className="small">내 원소와 모든 방, 카드가 지워지고 처음 상태로 돌아가요.</p>
+            <div className="stack-s"><p className="small">내 원소와 모든 실험실, 카드가 지워지고 처음 상태로 돌아가요.</p>
               <div className="row"><button className="btn ghost" onClick={() => setConfirmReset(false)}>취소</button><button className="btn danger grow" onClick={() => { reset(); onClose(); }}>초기화</button></div></div>
           )}
         </div>
@@ -1008,8 +1044,8 @@ function PeriodicTable({ initial }: { initial?: string }) {
             <div className="row">
               {mols.map((m) => <span key={m.id} className="chip" title={m.name}><Formula f={m.formula} className="mono" /> {m.name}</span>)}
             </div>
-            <p className="small muted">지금 {ELEMENTS[el].name} 자리가 남은 모집방 {openRooms}곳</p>
-            {el === mine && openRooms > 0 && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => go({ k: 'rooms' })}>내 자리 있는 방 보기</button>}
+            <p className="small muted">지금 {ELEMENTS[el].name} 자리가 남은 모집 중인 실험실 {openRooms}곳</p>
+            {el === mine && openRooms > 0 && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => go({ k: 'rooms' })}>내 자리 있는 실험실 보기</button>}
           </div>
         </div>
       ) : (

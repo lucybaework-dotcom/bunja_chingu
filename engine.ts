@@ -51,7 +51,7 @@ export const waitingEntry = (s: State, uid: Id) => s.queue.find((q) => q.userId 
 
 export function isRecruitingOpen(r: Room) { return r.recruitment === 'recruiting' && r.closedAt === null; }
 
-/** 사용자가 점유 중인 모집 자리 (모집 중인 방 + 자동 매칭 대기). */
+/** 사용자가 점유 중인 모집 자리 (모집 중인 실험실 + 자동 매칭 대기). */
 export function recruitingCommitments(s: State, uid: Id): { rooms: Id[]; queued: boolean } {
   const rooms = s.members.filter((m) => m.userId === uid && m.leftAt === null && isRecruitingOpen(s.rooms[m.roomId])).map((m) => m.roomId);
   return { rooms, queued: !!waitingEntry(s, uid) };
@@ -84,7 +84,7 @@ function lockedUser(s: State, uid: Id) {
   if (!u.elementId || !u.elementLockedAt) fail('원소를 먼저 확정해 주세요.');
   return u as typeof u & { elementId: ElementId };
 }
-function room(s: State, id: Id) { return s.rooms[id] ?? fail('방을 찾을 수 없어요.'); }
+function room(s: State, id: Id) { return s.rooms[id] ?? fail('실험실을 찾을 수 없어요.'); }
 function notify(s: State, uid: Id, text: string, roomId: Id | undefined, now: number) {
   s.notifications.push({ id: nid(s, 'n'), userId: uid, text, roomId, createdAt: now, readAt: null });
 }
@@ -97,7 +97,7 @@ function sys(s: State, roomId: Id, body: string, now: number) {
 function assertFree(s: State, uid: Id) {
   const c = recruitingCommitments(s, uid);
   if (c.queued) fail('자동 매칭 대기 중이에요. 대기를 취소한 뒤 다시 시도해 주세요.');
-  if (c.rooms.length) fail('모집 중인 방은 한 곳만 참여할 수 있어요.');
+  if (c.rooms.length) fail('모집 중인 실험실은 한 곳만 참여할 수 있어요.');
 }
 function voidOpenProposals(s: State, roomId: Id, now: number) {
   for (const p of s.proposals) if (p.roomId === roomId && p.status === 'open') {
@@ -109,17 +109,17 @@ const molName = (id: string) => { const m = moleculeById(id)!; return `${m.name}
 
 function addMember(s: State, roomId: Id, uid: Id, via: 'create' | 'join' | 'auto', now: number) {
   const r = room(s, roomId), u = lockedUser(s, uid);
-  if (!isRecruitingOpen(r)) fail('지금은 모집 중인 방이 아니에요.');
-  if (isMember(s, roomId, uid)) fail('이미 이 방에 있어요.');
+  if (!isRecruitingOpen(r)) fail('지금은 모집 중인 실험실이 아니에요.');
+  if (isMember(s, roomId, uid)) fail('이미 이 실험실에 있어요.');
   const target = moleculeById(r.targetMoleculeId)!.atomCounts;
-  if (!hasVacancy(target, roomCounts(s, roomId), u.elementId)) fail(`이 방에는 ${ELEMENTS[u.elementId].name} 자리가 남아 있지 않아요.`);
+  if (!hasVacancy(target, roomCounts(s, roomId), u.elementId)) fail(`이 실험실에는 ${ELEMENTS[u.elementId].name} 자리가 남아 있지 않아요.`);
   const others = activeMembers(s, roomId).map((m) => m.elementSnapshot);
   s.members.push({ roomId, userId: uid, elementSnapshot: u.elementId, introSnapshot: u.intro, joinedAt: now, leftAt: null, via,
     reason: via === 'auto' && others.length ? matchReason(u.elementId, others) : undefined });
   voidOpenProposals(s, roomId, now);
   if (via !== 'create') {
     sys(s, roomId, `${j(`${ELEMENTS[u.elementId].name}(${u.elementId})`, '이/가')} 합류했어요.`, now);
-    if (canChat(s, roomId, uid)) notifyRoom(s, roomId, `${molName(r.targetMoleculeId)} 방에 ${j(ELEMENTS[u.elementId].name, '이/가')} 합류했어요.`, now, uid);
+    if (canChat(s, roomId, uid)) notifyRoom(s, roomId, `${molName(r.targetMoleculeId)} 실험실에 ${j(ELEMENTS[u.elementId].name, '이/가')} 합류했어요.`, now, uid);
   }
   checkComplete(s, roomId, now);
 }
@@ -163,8 +163,8 @@ function rejectProposal(s: State, p: Proposal, status: 'rejected' | 'expired', n
   const r = s.rooms[p.roomId];
   if (p.reason === 'deadline') {
     r.recruitment = 'failed'; r.closedAt = now; r.closeReason = 'deadline';
-    sys(s, r.id, '모집 기한이 지나고 전원 동의를 얻지 못해 방이 종료됐어요.', now);
-    notifyRoom(s, r.id, `${molName(r.targetMoleculeId)} 방이 모집 마감으로 종료됐어요.`, now);
+    sys(s, r.id, '모집 기한이 지나고 전원 동의를 얻지 못해 실험실이 종료됐어요.', now);
+    notifyRoom(s, r.id, `${molName(r.targetMoleculeId)} 실험실이 모집 마감으로 종료됐어요.`, now);
   } else {
     sys(s, r.id, status === 'expired' ? '응답 기한이 지나 제안이 무산됐어요.' : '전원 동의를 얻지 못해 제안이 무산됐어요.', now);
   }
@@ -234,7 +234,7 @@ function drainQueue(s: State, now: number) {
       if (r) {
         q.status = 'matched'; q.resolvedAt = now;
         addMember(s, r.id, q.userId, 'auto', now);
-        notify(s, q.userId, `자동 매칭으로 ${molName(r.targetMoleculeId)} 방에 들어갔어요.`, r.id, now);
+        notify(s, q.userId, `자동 매칭으로 ${molName(r.targetMoleculeId)} 실험실에 들어갔어요.`, r.id, now);
         changed = true;
       }
     }
@@ -248,8 +248,8 @@ function drainQueue(s: State, now: number) {
       // 방장의 추천 이유도 채운다
       const hm = s.members.find((m) => m.roomId === rid && m.userId === host)!;
       hm.reason = matchReason(hm.elementSnapshot, entries.filter((e) => e.userId !== host).map((e) => s.users[e.userId].elementId!));
-      sys(s, rid, '자동 매칭으로 만들어진 방이에요. 가장 먼저 기다린 분이 방장이 됐어요.', now);
-      for (const e of entries) notify(s, e.userId, `자동 매칭 완료! ${molName(g.moleculeId)} 방이 만들어졌어요.`, rid, now);
+      sys(s, rid, '자동 매칭으로 만들어진 실험실이에요. 가장 먼저 기다린 분이 방장이 됐어요.', now);
+      for (const e of entries) notify(s, e.userId, `자동 매칭 완료! ${molName(g.moleculeId)} 실험실이 만들어졌어요.`, rid, now);
       changed = true;
     }
     if (!changed) return;
@@ -306,7 +306,7 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       const days = Math.max(1, Math.min(14, Math.round(cmd.recruitDays ?? s.config.defaultRecruitDays)));
       const id = createRoomInternal(s, u.id, m.id, cmd.chatPolicy, 'manual', now, days);
       addMember(s, id, u.id, 'create', now);
-      sys(s, id, cmd.chatPolicy === 'immediate' ? '방이 열렸어요. 들어오는 대로 대화할 수 있어요.' : '방이 열렸어요. 분자가 완성되면 채팅이 열려요.', now);
+      sys(s, id, cmd.chatPolicy === 'immediate' ? '실험실이 열렸어요. 들어오는 대로 대화할 수 있어요.' : '실험실이 열렸어요. 분자가 완성되면 채팅이 열려요.', now);
       createdId = id; break;
     }
     case 'joinRoom': {
@@ -315,11 +315,11 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
     }
     case 'leaveRoom': {
       const r = room(s, cmd.roomId);
-      const mem = s.members.find((m) => m.roomId === r.id && m.userId === cmd.actor && m.leftAt === null) ?? fail('이 방의 구성원이 아니에요.');
-      if (r.closedAt) fail('이미 종료된 방이에요.');
+      const mem = s.members.find((m) => m.roomId === r.id && m.userId === cmd.actor && m.leftAt === null) ?? fail('이 실험실의 구성원이 아니에요.');
+      if (r.closedAt) fail('이미 종료된 실험실이에요.');
       const wasComplete = r.recruitment === 'complete';
       mem.leftAt = now; // 이탈 이력은 삭제하지 않는다.
-      sys(s, r.id, `${j(`${ELEMENTS[mem.elementSnapshot].name}(${mem.elementSnapshot})`, '이/가')} 방을 나갔어요.`, now);
+      sys(s, r.id, `${j(`${ELEMENTS[mem.elementSnapshot].name}(${mem.elementSnapshot})`, '이/가')} 실험실을 나갔어요.`, now);
       voidOpenProposals(s, r.id, now);
       const pm = pendingMeeting(s, r.id);
       if (pm && pm.attendees.some((a) => a.userId === cmd.actor)) {
@@ -337,7 +337,7 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
         sys(s, r.id, '첫 만남 전에 구성원이 나가서 빈자리를 다시 모집해요.', now);
         if (exact.length) openProposalInternal(s, r.id, 'earlyComplete', 'departure', exact[0].id, null, now);
         for (const m of rest) if (hasConflict(s, m.userId))
-          notify(s, m.userId, '다시 모집 중인 방과 다른 모집방에 함께 속해 있어요. 한 곳을 골라 주세요.', r.id, now);
+          notify(s, m.userId, '다시 모집 중인 실험실과 다른 모집 중인 실험실에 함께 속해 있어요. 한 곳을 골라 주세요.', r.id, now);
       }
       break;
     }
@@ -360,13 +360,13 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
     case 'sendMessage': {
       const body = cmd.body.trim();
       if (!body) fail('메시지를 입력해 주세요.');
-      if (!canChat(s, cmd.roomId, cmd.actor)) fail('지금은 이 방에서 채팅할 수 없어요.');
+      if (!canChat(s, cmd.roomId, cmd.actor)) fail('지금은 이 실험실에서 채팅할 수 없어요.');
       s.messages.push({ id: nid(s, 'm'), roomId: cmd.roomId, senderId: cmd.actor, body: body.slice(0, 500), createdAt: now }); break;
     }
     case 'propose': {
       const r = room(s, cmd.roomId);
       if (!isMember(s, r.id, cmd.actor)) fail('구성원만 제안할 수 있어요.');
-      if (!isRecruitingOpen(r)) fail('모집 중인 방에서만 제안할 수 있어요.');
+      if (!isRecruitingOpen(r)) fail('모집 중인 실험실에서만 제안할 수 있어요.');
       if (openProposal(s, r.id)) fail('이미 진행 중인 투표가 있어요.');
       const counts = roomCounts(s, r.id);
       if (cmd.kind === 'earlyComplete') {
@@ -400,15 +400,15 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
     }
     case 'expireRecruitment': {
       const r = room(s, cmd.roomId);
-      if (!isRecruitingOpen(r)) fail('모집 중인 방이 아니에요.');
+      if (!isRecruitingOpen(r)) fail('모집 중인 실험실이 아니에요.');
       const exact = activeMembers(s, r.id).length >= 2 ? exactMatches(roomCounts(s, r.id)) : [];
       if (exact.length) {
         sys(s, r.id, '모집 기한이 끝났어요. 지금 구성으로 만들 수 있는 분자가 있어요.', now);
         createdId = openProposalInternal(s, r.id, 'earlyComplete', 'deadline', exact[0].id, null, now).id;
       } else {
         r.recruitment = 'failed'; r.closedAt = now; r.closeReason = 'deadline';
-        sys(s, r.id, '모집 기한이 끝났고 지금 구성으로 만들 수 있는 분자가 없어 방이 종료됐어요.', now);
-        notifyRoom(s, r.id, `${molName(r.targetMoleculeId)} 방이 모집 마감으로 종료됐어요.`, now);
+        sys(s, r.id, '모집 기한이 끝났고 지금 구성으로 만들 수 있는 분자가 없어 실험실이 종료됐어요.', now);
+        notifyRoom(s, r.id, `${molName(r.targetMoleculeId)} 실험실이 모집 마감으로 종료됐어요.`, now);
       }
       break;
     }
@@ -419,25 +419,25 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
     }
     case 'closeRoom': {
       const r = room(s, cmd.roomId);
-      if (r.hostId !== cmd.actor) fail('방장만 방을 종료할 수 있어요.');
-      if (r.closedAt) fail('이미 종료된 방이에요.');
+      if (r.hostId !== cmd.actor) fail('방장만 실험실을 종료할 수 있어요.');
+      if (r.closedAt) fail('이미 종료된 실험실이에요.');
       r.closedAt = now; r.closeReason = 'host';
       for (const p of s.proposals) if (p.roomId === r.id && p.status === 'open') p.status = 'void';
       const pm = pendingMeeting(s, r.id); if (pm) pm.status = 'superseded';
-      sys(s, r.id, '방장이 방을 종료했어요. 이미 얻은 카드와 만남 기록은 그대로 남아요.', now);
-      notifyRoom(s, r.id, `${molName(r.targetMoleculeId)} 방이 종료됐어요.`, now, cmd.actor);
+      sys(s, r.id, '방장이 실험실을 종료했어요. 이미 얻은 카드와 만남 기록은 그대로 남아요.', now);
+      notifyRoom(s, r.id, `${molName(r.targetMoleculeId)} 실험실이 종료됐어요.`, now, cmd.actor);
       break;
     }
     case 'proposeMeeting': {
       const r = room(s, cmd.roomId);
       if (r.hostId !== cmd.actor) fail('방장만 참석자를 제안할 수 있어요.');
-      if (r.closedAt) fail('종료된 방이에요.');
+      if (r.closedAt) fail('종료된 실험실이에요.');
       if (r.firstMeetingConfirmedAt !== null) fail('첫 만남은 이미 기록됐어요.');
       if (r.recruitment !== 'complete') fail('분자가 완성된 뒤에 만남을 기록할 수 있어요.');
       const ids = [...new Set(cmd.attendeeIds)];
       const act = activeMembers(s, r.id);
       if (ids.length < 2) fail('참석자를 두 명 이상 골라 주세요.');
-      if (!ids.every((id) => act.some((m) => m.userId === id))) fail('방 구성원만 참석자로 고를 수 있어요.');
+      if (!ids.every((id) => act.some((m) => m.userId === id))) fail('실험실 구성원만 참석자로 고를 수 있어요.');
       const prevM = pendingMeeting(s, r.id);
       if (prevM) prevM.status = 'superseded'; // 수정하면 기존 확인은 모두 무효
       const attendees = ids.map((id) => { const m = act.find((x) => x.userId === id)!; return { userId: id, element: m.elementSnapshot, intro: s.users[id].intro }; });
@@ -473,7 +473,7 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
     }
     case 'resolveConflict': {
       const c = recruitingCommitments(s, cmd.actor);
-      if (!c.rooms.includes(cmd.keepRoomId)) fail('고른 방이 모집 중인 내 방이 아니에요.');
+      if (!c.rooms.includes(cmd.keepRoomId)) fail('고른 실험실이 모집 중인 내 실험실이 아니에요.');
       for (const rid of c.rooms) if (rid !== cmd.keepRoomId) return apply(s, { type: 'leaveRoom', actor: cmd.actor, roomId: rid }, now);
       const q = waitingEntry(s, cmd.actor); if (q) { q.status = 'cancelled'; q.resolvedAt = now; }
       break;

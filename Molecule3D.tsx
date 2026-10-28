@@ -9,6 +9,13 @@ const ION: Record<string, number> = { Na: 1.02, K: 1.38, Mg: 0.72, Al: 0.54, Cl:
 
 export function hasModel(id: string) { return !!GEOMETRY[id]; }
 
+/** 두 색을 섞는다 (불투명). t=0이면 a, t=1이면 b */
+function mix(a: string, b: string, t: number): string {
+  const p = (h: string) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const A = p(a), B = p(b);
+  return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`;
+}
+
 export default function Molecule3D({ id, height = 200, label }: { id: string; height?: number; label: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const g = GEOMETRY[id];
@@ -25,6 +32,8 @@ export default function Molecule3D({ id, height = 200, label }: { id: string; he
     const atoms = g.atoms.map(([el, x, y, z]) => ({ el, p: [x, y, z] as [number, number, number], r: 0.22 + 0.42 * (ionic && el !== 'H' && ION[el] ? ION[el] * 0.55 : (COV[el] ?? 0.8)) }));
     const R = Math.max(1.2, ...atoms.map((a) => Math.hypot(...a.p) + a.r));
     const colors = atoms.map((a) => elementColor(a.el));
+    // 하이라이트·그늘을 불투명한 색으로 미리 계산 (배경이 비치지 않게)
+    const shades = colors.map((c) => ({ light: mix(c.bg, '#ffffff', 0.65), mid: c.bg, dark: mix(c.bg, '#000000', 0.38) }));
     const line = getComputedStyle(cv).getPropertyValue('--ink-2').trim() || '#888';
 
     const draw = () => {
@@ -32,7 +41,7 @@ export default function Molecule3D({ id, height = 200, label }: { id: string; he
       if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      const scale = (Math.min(w, h) / 2 - 10) / R, cam = R * 4;
+      const scale = (Math.min(w, h) / 2 - 18) / R, cam = R * 4;
       const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
       const proj = atoms.map(({ p: [x, y, z] }) => {
         const x1 = cy * x + sy * z, z1 = -sy * x + cy * z;
@@ -67,14 +76,29 @@ export default function Molecule3D({ id, height = 200, label }: { id: string; he
           }
         } });
       }
+      // 바닥 그림자: 분자 아래 평면에 원자마다 흐린 타원을 깐다
+      const floor = Math.min(h - 8, h / 2 + R * scale * 0.9);
+      ctx.save();
+      atoms.forEach((at, i) => {
+        const P = proj[i], rad = at.r * scale * P.k;
+        const sx = P.x + (P.x - w / 2) * 0.05, rx = rad * 1.15, ry = rad * 0.32;
+        const sh = ctx.createRadialGradient(sx, floor, 0, sx, floor, rx);
+        sh.addColorStop(0, 'rgba(0,0,0,0.22)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = sh;
+        ctx.beginPath(); ctx.ellipse(sx, floor, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.restore();
       atoms.forEach((at, i) => {
         const P = proj[i];
         items.push({ z: P.z, draw: () => {
           const rad = at.r * scale * P.k;
-          const grd = ctx.createRadialGradient(P.x - rad * 0.35, P.y - rad * 0.4, rad * 0.1, P.x, P.y, rad);
-          grd.addColorStop(0, 'rgba(255,255,255,0.85)'); grd.addColorStop(0.28, colors[i].bg); grd.addColorStop(1, colors[i].bg);
+          const grd = ctx.createRadialGradient(P.x - rad * 0.35, P.y - rad * 0.4, rad * 0.05, P.x, P.y, rad);
+          grd.addColorStop(0, shades[i].light); grd.addColorStop(0.35, shades[i].mid); grd.addColorStop(1, shades[i].dark);
+          ctx.save();
+          ctx.shadowColor = 'rgba(0,0,0,0.28)'; ctx.shadowBlur = rad * 0.5; ctx.shadowOffsetY = rad * 0.18;
           ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(P.x, P.y, rad, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 1; ctx.stroke();
+          ctx.restore();
+          ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(P.x, P.y, rad, 0, Math.PI * 2); ctx.stroke();
           if (rad > 11) {
             ctx.fillStyle = colors[i].ink; ctx.font = `600 ${Math.min(16, rad * 0.75)}px "IBM Plex Mono", ui-monospace, monospace`;
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(at.el, P.x, P.y + 1);
