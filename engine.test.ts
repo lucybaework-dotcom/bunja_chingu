@@ -7,6 +7,7 @@ import type { ElementId } from './molecules';
 import type { State } from './types';
 import { seedState } from './seed';
 import { j } from './josa';
+import { elementColor, inkContrast } from './colors';
 
 function harness() {
   let s: State = emptyState(); let t = 1_000_000;
@@ -45,6 +46,16 @@ describe('화학 카탈로그', () => {
   });
   it('사용 가능한 원소는 카탈로그에 실제로 등장하는 원소뿐', () => {
     expect(usableElements()).toEqual(ELEMENT_ORDER.filter((e) => USABLE().some((m) => m.atomCounts[e])));
+  });
+});
+
+describe('원소 색', () => {
+  it('같은 족은 같은 색상, 주기가 내려갈수록 진해지고 글자 대비는 4.5 이상', () => {
+    expect(elementColor('H').hue).toBe(elementColor('Na').hue); expect(elementColor('Na').hue).toBe(elementColor('K').hue);
+    expect(elementColor('F').hue).toBe(elementColor('Cl').hue); expect(elementColor('C').hue).not.toBe(elementColor('N').hue);
+    const l = (x: string) => +elementColor(x).bg.match(/(\d+)%\)$/)![1];
+    expect(l('H')).toBeGreaterThan(l('Na')); expect(l('Na')).toBeGreaterThan(l('K')); expect(l('O')).toBeGreaterThan(l('S'));
+    for (const e of usableElements()) expect(inkContrast(e)).toBeGreaterThanOrEqual(4.5);
   });
 });
 

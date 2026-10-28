@@ -2,11 +2,12 @@ import type React from 'react';
 import { ELEMENTS } from './elements';
 import { moleculeById, type AtomCounts, type ElementId } from './molecules';
 import { slotsOf } from './chemistry';
+import { elementColor } from './colors';
 import type { RoomMember } from './types';
 
 export function Atom({ el, size = 40, empty, me, title }: { el: ElementId; size?: number; empty?: boolean; me?: boolean; title?: string }) {
   return (
-    <span className={`atom el-${el}${empty ? ' empty' : ''}${me ? ' me' : ''}`} style={{ ['--s' as string]: `${size}px` }}
+    <span className={`atom${empty ? ' empty' : ''}${me ? ' me' : ''}`} style={{ ['--s' as string]: `${size}px`, ['--c' as string]: elementColor(el).bg, ['--i' as string]: elementColor(el).ink }}
       title={title ?? `${ELEMENTS[el].name}${empty ? ' 빈자리' : ''}`} aria-label={`${ELEMENTS[el].name}${empty ? ' 빈자리' : ''}`}>
       {el}
     </span>

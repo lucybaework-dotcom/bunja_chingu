@@ -11,6 +11,7 @@ import {
 } from './engine';
 import type { Room, State } from './types';
 import { PERIODIC, PT_GROUPS, PT_PERIODS } from './periodic';
+import { elementColor } from './colors';
 import { Atom, fmtDate, fmtTime, Formula, Icon, MoleculeStrip, MolTitle } from './bits';
 
 type View =
@@ -966,7 +967,8 @@ function PeriodicTable({ initial }: { initial?: string }) {
             const on = usable.includes(c.symbol);
             return (
               <button key={c.symbol} role="gridcell" aria-selected={sel === c.symbol}
-                className={`pt-cell${on ? ` on el-${c.symbol}` : ''}${sel === c.symbol ? ' sel' : ''}${g === 13 ? ' split' : ''}`}
+                className={`pt-cell${on ? ' on' : ''}${sel === c.symbol ? ' sel' : ''}`}
+                style={{ ['--c' as string]: elementColor(c.symbol).bg, ['--i' as string]: elementColor(c.symbol).ink, ['--t' as string]: elementColor(c.symbol).tint, ['--d' as string]: `${(period - 1) * 40 + PT_GROUPS.indexOf(g) * 18}ms` }}
                 onClick={() => setSel(c.symbol)} aria-label={`${c.name}${on ? '' : ', 아직 쓰지 않는 원소'}${c.symbol === mine ? ', 내 원소' : ''}`}>
                 <span className="pt-z mono">{c.z}</span>
                 <span className="pt-sym mono">{c.symbol}</span>
@@ -977,10 +979,13 @@ function PeriodicTable({ initial }: { initial?: string }) {
           }))}
         </div>
       </div>
-      <div className="row small muted"><span className="pt-key on" aria-hidden="true" /> 고를 수 있는 원소 <span className="pt-key" aria-hidden="true" style={{ marginLeft: 8 }} /> 아직 쓰지 않는 원소</div>
+      <div className="stack-s small muted">
+        <div className="row"><span className="pt-key on" aria-hidden="true" style={{ background: elementColor('O').bg }} /> 고를 수 있는 원소 <span className="pt-key" aria-hidden="true" style={{ marginLeft: 8, background: elementColor('O').tint }} /> 아직 쓰지 않는 원소</div>
+        <div className="row"><span className="pt-ramp" aria-hidden="true">{['H', 'Na', 'K'].map((x) => <span key={x} style={{ background: elementColor(x).bg }} />)}</span> 같은 족은 같은 색, 아래 주기로 갈수록 진해져요</div>
+      </div>
 
       {active ? (
-        <>
+        <div key={sel} className="stack pt-detail">
           <div className="panel">
             {el === mine && <span className="chip on" style={{ alignSelf: 'flex-start' }}>내 원소</span>}
             <ElementDetail el={el} />
@@ -993,11 +998,11 @@ function PeriodicTable({ initial }: { initial?: string }) {
             <p className="small muted">지금 {ELEMENTS[el].name} 자리가 남은 모집방 {openRooms}곳</p>
             {el === mine && openRooms > 0 && <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => go({ k: 'rooms' })}>내 자리 있는 방 보기</button>}
           </div>
-        </>
+        </div>
       ) : (
-        <div className="panel flat">
+        <div key={sel} className="panel flat pt-detail">
           <div className="row" style={{ gap: 12, flexWrap: 'nowrap' }}>
-            <span className="pt-cell big" aria-hidden="true"><span className="pt-z mono">{cell.z}</span><span className="pt-sym mono">{cell.symbol}</span></span>
+            <span className="pt-cell big" aria-hidden="true" style={{ ['--t' as string]: elementColor(cell.symbol).tint }}><span className="pt-z mono">{cell.z}</span><span className="pt-sym mono">{cell.symbol}</span></span>
             <div className="stack-s grow"><h2>{cell.name}</h2><p className="small">{cell.note}</p></div>
           </div>
           <p className="small muted">원소 목록은 실제 분자 카탈로그가 검토되면서 늘어날 수 있어요.</p>
