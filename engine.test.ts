@@ -49,6 +49,21 @@ describe('화학 카탈로그', () => {
   });
 });
 
+import { GEOMETRY } from './geometry';
+describe('3D 모형 데이터', () => {
+  it('모든 분자·화합물에 모형이 있고, 분자 모형의 원자 수는 화학식과 같다', () => {
+    for (const m of MOLECULES) {
+      const g = GEOMETRY[m.id];
+      expect(g, m.id).toBeTruthy();
+      if (m.kind === 'ionic') { expect(g.note).toBeTruthy(); continue; }
+      const c: Record<string, number> = {};
+      for (const [el] of g.atoms) c[el] = (c[el] ?? 0) + 1;
+      expect(c, m.id).toEqual(m.atomCounts);
+      for (const [a, b] of g.bonds) { expect(g.atoms[a]).toBeTruthy(); expect(g.atoms[b]).toBeTruthy(); }
+    }
+  });
+});
+
 describe('원소 색', () => {
   it('같은 족은 같은 색상, 주기가 내려갈수록 진해지고 글자 대비는 4.5 이상', () => {
     expect(elementColor('H').hue).toBe(elementColor('Na').hue); expect(elementColor('Na').hue).toBe(elementColor('K').hue);

@@ -1,5 +1,5 @@
 import { j, josaOf } from './josa';
-import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ELEMENTS, METAPHOR_NOTICE, pairContent } from './elements';
 import { kindLabel, moleculeById, type ElementId } from './molecules';
 import { CONTEXT_LABEL, QUESTIONS, scoreQuiz } from './quiz';
@@ -12,6 +12,7 @@ import {
 import type { Room, State } from './types';
 import { PERIODIC, PT_GROUPS, PT_PERIODS } from './periodic';
 import { elementColor } from './colors';
+import Molecule3D from './Molecule3D';
 import { Atom, fmtDate, fmtTime, Formula, Icon, MoleculeStrip, MolTitle } from './bits';
 
 type View =
@@ -414,12 +415,15 @@ function CreateRoom() {
           <span className="eyebrow">{n}명</span>
           <div className="stack-s">
             {cands.filter((m) => m.totalAtoms === n).map((m) => (
-              <button key={m.id} className={`option${mol === m.id ? ' sel' : ''}`} onClick={() => setMol(m.id)} aria-pressed={mol === m.id}>
+              <Fragment key={m.id}>
+              <button className={`option${mol === m.id ? ' sel' : ''}`} onClick={() => setMol(m.id)} aria-pressed={mol === m.id}>
                 <div className="row between" style={{ flexWrap: 'nowrap' }}>
                   <span className="row"><Formula f={m.formula} style={{ fontSize: 18, minWidth: 74 }} /><span>{m.name}</span>{m.kind === 'ionic' && <span className="chip">이온 결정</span>}</span>
                   <MoleculeStrip formula={m.formula} target={m.atomCounts} members={[]} size={18} labels={false} />
                 </div>
               </button>
+              {mol === m.id && <div className="panel" style={{ padding: 10 }}><Molecule3D id={m.id} height={150} label={m.name} /></div>}
+              </Fragment>
             ))}
           </div>
         </section>
@@ -502,6 +506,7 @@ function RoomDetail({ id }: { id: string }) {
         <p className="small">첫 만남 결과: {r.firstMeetingMoleculeId ? <strong>{molName(r.firstMeetingMoleculeId)} 카드 획득</strong> : '유효한 분자가 아니어서 카드 없이 기록만 남았어요'}</p>
       )}
       <div className="panel">
+        <Molecule3D id={m.id} height={170} label={m.name} />
         <MoleculeStrip formula={m.formula} target={m.atomCounts} members={mems} meId={viewer} size={44} />
         {isRecruitingOpen(r) && (
           <p className="small muted">남은 자리: {Object.entries(vac).map(([e, n]) => `${ELEMENTS[e as ElementId].name} ${n}`).join(', ') || '없음'} · 마감 {fmtTime(r.deadline)}</p>
@@ -781,7 +786,7 @@ function CardDetail({ mol }: { mol: string }) {
         <Formula f={m.formula} className="formula xl" />
         <h2>{m.name}</h2>
         <span className="chip">{kindLabel(m)}</span>
-        <MoleculeStrip formula={m.formula} target={m.atomCounts} members={[]} size={30} labels={false} />
+        <div style={{ width: '100%' }}><Molecule3D id={m.id} height={240} label={m.name} /></div>
         <p className="small">{m.stabilityNote}</p>
         <p className="small muted mono">{m.sources.join(' · ')} · 처음 얻은 날 {fmtDate(c.firstEarnedAt)}</p>
         <div className="row between" style={{ width: '100%' }}>
