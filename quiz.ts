@@ -33,14 +33,14 @@ export const QUESTIONS: Question[] = [
   { id: 'u4', context: 'usual', text: '나를 가장 잘 나타내는 말은', options: [
     { text: '호불호 갈려도 확실한 개성', points: { S: 2 } },
     { text: '확 타오르는 열정, 가끔 방전', points: { P: 2 } },
-    { text: '묵묵한 실력파', points: { Si: 2 } },
+    { text: '조용하지만 단단한 편', points: { N: 2, C: 1 } },
     { text: '강렬한 첫인상', points: { F: 2 } },
   ] },
   { id: 'u5', context: 'usual', text: '내가 좋아하는 내 모습은', options: [
     { text: '아낌없이 퍼주는 나', points: { Na: 2 } },
     { text: '생각나면 바로 떠나는 나', points: { K: 2 } },
-    { text: '든든하게 받쳐 주는 나', points: { Mg: 2 } },
-    { text: '어디서든 적응하는 나', points: { Al: 2 } },
+    { text: '든든하게 받쳐 주는 나', points: { N: 2 } },
+    { text: '어디서든 잘 섞이는 나', points: { H: 2 } },
   ] },
   { id: 'f1', context: 'friends', text: '처음 모인 자리에서 정적이 흐르면', options: [
     { text: '내가 먼저 아무 말이나 꺼낸다', points: { H: 2 } },
@@ -69,14 +69,14 @@ export const QUESTIONS: Question[] = [
   { id: 'f5', context: 'friends', text: '친구들 사이에서 내가 자주 맡는 역할은', options: [
     { text: '분위기 메이커, 웃음 담당', points: { S: 2, H: 1 } },
     { text: '응원단장, 다들 움직이게 함', points: { P: 2, O: 1 } },
-    { text: '해결사, 막히면 다들 나한테 옴', points: { Si: 2, C: 1 } },
+    { text: '해결사, 막히면 다들 나한테 옴', points: { C: 2, Cl: 1 } },
     { text: '절친 한두 명을 끝까지 챙김', points: { F: 2, N: 1 } },
   ] },
   { id: 'f6', context: 'friends', text: '친구가 힘들어 보일 때 나는', options: [
     { text: '맛있는 거 사 들고 찾아간다', points: { Na: 2, H: 1 } },
     { text: '기분 변화를 바로 알아채고 연락한다', points: { K: 2, O: 1 } },
-    { text: '말없이 곁을 지킨다', points: { Mg: 2, N: 1 } },
-    { text: '현실적인 해결책을 찾아 준다', points: { Al: 2, Si: 1 } },
+    { text: '말없이 곁을 지킨다', points: { N: 2 } },
+    { text: '현실적인 해결책을 찾아 준다', points: { Cl: 2, C: 1 } },
   ] },
   { id: 'w1', context: 'future', text: '친구들 사이에서 앞으로 되고 싶은 모습은', options: [
     { text: '어디서든 반가운 사람', points: { H: 2 } },
@@ -93,7 +93,7 @@ export const QUESTIONS: Question[] = [
   { id: 'w3', context: 'future', text: '앞으로 친구들에게 듣고 싶은 말은', options: [
     { text: '너 없으면 재미없어', points: { S: 2, H: 1 } },
     { text: '너 덕분에 시작했어', points: { P: 2, O: 1 } },
-    { text: '너라면 믿고 맡길게', points: { Si: 2, C: 1 } },
+    { text: '너라면 믿고 맡길게', points: { C: 2, N: 1 } },
     { text: '넌 진짜 의리 있어', points: { F: 2, N: 1 } },
   ] },
 ];

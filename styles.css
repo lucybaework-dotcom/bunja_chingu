@@ -182,7 +182,7 @@ textarea.input { resize: vertical; }
 .pt-key { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1px dashed var(--ink-2); }
 .pt-key.on { border: 1.5px solid var(--atom-ring); }
 .pt-ramp { display: inline-flex; gap: 2px; }
-.pt-ramp span { width: 12px; height: 14px; border-radius: 3px; }
+.pt-ramp span { width: 12px; height: 14px; border-radius: 3px; border: 1px solid var(--atom-ring); }
 
 /* 주기율표 움직임: 처음 칸이 차례로 떠오르고, 누르면 눌리고, 고른 칸은 톡 튀고, 설명은 아래에서 올라온다 */
 .pt-cell { transition: transform .16s ease, box-shadow .16s ease, outline-color .16s ease; animation: pt-in .42s cubic-bezier(.2,.8,.2,1) backwards; animation-delay: var(--d, 0ms); }

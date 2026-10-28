@@ -10,9 +10,9 @@ const V: [ElementId, string][] = [
   ['N', '말수는 적지만 잘 들어요'], ['H', '노래방 가면 탬버린 담당'],
   ['Cl', '취향 확실한 편, 음악 추천 자신 있음'], ['N', '조용한 카페 좋아해요'],
   ['S', '밈 수집가, 웃기는 거 자신 있어요'], ['F', '친해지면 오래 가는 스타일'],
-  ['P', '같이 뭐 하자고 먼저 말하는 편'], ['Si', '공대생, 고장 난 거 잘 고쳐요'],
+  ['P', '같이 뭐 하자고 먼저 말하는 편'], ['O', '공대생, 고장 난 거 잘 고쳐요'],
   ['Na', '간식 항상 들고 다녀요'], ['K', '즉흥 여행 좋아해요'],
-  ['Mg', '운동 메이트 구해요'], ['Al', '자취 9년 차, 살림 고수'],
+  ['H', '운동 메이트 구해요'], ['Cl', '자취 9년 차, 살림 고수'],
 ];
 
 export function seedState(now: number): State {
@@ -36,7 +36,7 @@ export function seedState(now: number): State {
   run({ type: 'createRoom', actor: ids[12], moleculeId: 'ph3', chatPolicy: 'immediate' });
   run({ type: 'createRoom', actor: ids[14], moleculeId: 'nacl', chatPolicy: 'immediate' });
   run({ type: 'createRoom', actor: ids[15], moleculeId: 'k2co3', chatPolicy: 'afterComplete' });
-  run({ type: 'createRoom', actor: ids[17], moleculeId: 'al2o3', chatPolicy: 'immediate' });
+  run({ type: 'createRoom', actor: ids[17], moleculeId: 'kcl', chatPolicy: 'immediate' });
   // 자동 매칭 대기 중인 질소 한 명
   run({ type: 'startAutoMatch', actor: ids[9] });
   void ids[7]; // 가상 7은 아무 방에도 없는 수소 (시연 도구에서 사용)

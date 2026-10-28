@@ -65,11 +65,9 @@ describe('3D 모형 데이터', () => {
 });
 
 describe('원소 색', () => {
-  it('같은 족은 같은 색상, 주기가 내려갈수록 진해지고 글자 대비는 4.5 이상', () => {
-    expect(elementColor('H').hue).toBe(elementColor('Na').hue); expect(elementColor('Na').hue).toBe(elementColor('K').hue);
-    expect(elementColor('F').hue).toBe(elementColor('Cl').hue); expect(elementColor('C').hue).not.toBe(elementColor('N').hue);
-    const l = (x: string) => +elementColor(x).bg.match(/(\d+)%\)$/)![1];
-    expect(l('H')).toBeGreaterThan(l('Na')); expect(l('Na')).toBeGreaterThan(l('K')); expect(l('O')).toBeGreaterThan(l('S'));
+  it('CPK 색을 따르고 글자 대비는 4.5 이상', () => {
+    expect(elementColor('H').bg).toBe('#ffffff'); expect(elementColor('O').bg).toMatch(/^#e/i);
+    expect(elementColor('Cl').bg).not.toBe(elementColor('F').bg); expect(elementColor('Na').bg).not.toBe(elementColor('K').bg);
     for (const e of usableElements()) expect(inkContrast(e)).toBeGreaterThanOrEqual(4.5);
   });
 });
@@ -87,9 +85,9 @@ describe('조사 선택', () => {
 
 describe('이온 화합물', () => {
   it('Na, Mg, Al, K가 쓰이고 이온 화합물로 표시된다', () => {
-    for (const e of ['Na', 'Mg', 'Al', 'K'] as ElementId[]) expect(usableElements()).toContain(e);
+    for (const e of ['Na', 'K'] as ElementId[]) expect(usableElements()).toContain(e);
+    for (const e of ['Mg', 'Al', 'Si']) expect(usableElements() as string[]).not.toContain(e);
     expect(exactMatches(countsOf(['Na', 'Cl'])).map((m) => [m.id, m.kind])).toEqual([['nacl', 'ionic']]);
-    expect(exactMatches(countsOf(['Al', 'Al', 'O', 'O', 'O']))[0].id).toBe('al2o3');
     expect(exactMatches(countsOf(['Na', 'H', 'C', 'O', 'O', 'O']))[0].id).toBe('nahco3');
     expect(MOLECULES.filter((m) => m.kind === 'molecule').length).toBeGreaterThan(40);
   });
@@ -100,16 +98,16 @@ describe('이온 화합물', () => {
 
 describe('확장 원소', () => {
   it('F, Si, P, S가 사용 원소에 포함되고 각자 분자가 있다', () => {
-    for (const e of ['F', 'Si', 'P', 'S'] as ElementId[]) expect(usableElements()).toContain(e);
+    for (const e of ['F', 'P', 'S'] as ElementId[]) expect(usableElements()).toContain(e);
   });
   it('모든 사용 원소는 테스트에서 주 점수(2점)를 받는 선택지가 있다', () => {
     for (const e of usableElements()) expect(QUESTIONS.some((q) => q.options.some((o) => (o.points[e] ?? 0) >= 2))).toBe(true);
   });
   it('보류 분자(P₄, SiH₄, H₂CO)는 쓰이지 않는다', () => {
-    expect(exactMatches({ P: 4 })).toEqual([]); expect(exactMatches({ Si: 1, H: 4 })).toEqual([]); expect(exactMatches({ H: 2, C: 1, O: 1 })).toEqual([]);
+    expect(exactMatches({ P: 4 })).toEqual([]); expect(exactMatches({ H: 2, C: 1, O: 1 })).toEqual([]);
   });
-  it('Si 기호가 들어간 화학식도 올바른 원자 수', () => {
-    expect(exactMatches(countsOf(['Si', 'F', 'F', 'F', 'F'])).map((m) => m.id)).toEqual(['sif4']);
+  it('두 글자 기호가 들어간 화학식도 올바른 원자 수', () => {
+    expect(exactMatches(countsOf(['K', 'C', 'O', 'O', 'O', 'K'])).map((m) => m.id)).toEqual(['k2co3']);
   });
 });
 

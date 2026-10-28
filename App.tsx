@@ -993,8 +993,8 @@ function PeriodicTable({ initial }: { initial?: string }) {
         </div>
       </div>
       <div className="stack-s small muted">
-        <div className="row"><span className="pt-key on" aria-hidden="true" style={{ background: elementColor('O').bg }} /> 고를 수 있는 원소 <span className="pt-key" aria-hidden="true" style={{ marginLeft: 8, background: elementColor('O').tint }} /> 아직 쓰지 않는 원소</div>
-        <div className="row"><span className="pt-ramp" aria-hidden="true">{['H', 'Na', 'K'].map((x) => <span key={x} style={{ background: elementColor(x).bg }} />)}</span> 같은 족은 같은 색, 아래 주기로 갈수록 진해져요</div>
+        <div className="row"><span className="pt-key on" aria-hidden="true" style={{ background: elementColor('O').bg }} /> 고를 수 있는 원소 <span className="pt-key" aria-hidden="true" style={{ marginLeft: 8 }} /> 아직 쓰지 않는 원소</div>
+        <div className="row"><span className="pt-ramp" aria-hidden="true">{['C', 'H', 'N', 'O'].map((x) => <span key={x} style={{ background: elementColor(x).bg }} />)}</span> 분자 모형에서 흔히 쓰는 CPK 색이에요</div>
       </div>
 
       {active ? (
