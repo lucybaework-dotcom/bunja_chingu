@@ -1,7 +1,7 @@
 // 서버 연결 지점. 화면은 Backend 인터페이스만 사용한다.
 // LocalBackend: 이 기기의 브라우저 저장소 + 가상 사용자로 흐름을 시연한다 (다중 사용자 서비스가 아님).
-// 실제 서비스에서는 RemoteBackend가 같은 Command를 서버에 보내고, 서버가 engine.apply와 같은 규칙을
-// 트랜잭션 안에서 원자적으로 실행해야 한다 (입장·매칭·확정·카드 지급).
+// RemoteBackend: 같은 Command를 Supabase Edge Function에 보내고, 서버가 같은 규칙(engine.apply)을
+// 저장소 버전 확인과 함께 실행한다. 화면은 서버가 돌려준 "내 보기"만 그린다.
 import { apply, type Command } from './engine';
 import { DomainError, type State } from './types';
 import { seedState } from './seed';
@@ -9,15 +9,18 @@ import { seedState } from './seed';
 export interface DispatchResult { ok: boolean; error?: string; createdId?: string; info?: string }
 
 export interface Backend {
+  readonly mode: 'demo' | 'live';
   getState(): State;
-  dispatch(cmd: Command): DispatchResult;
+  dispatch(cmd: Command): Promise<DispatchResult>;
   subscribe(fn: () => void): () => void;
   reset(): void;
+  signOut?(): Promise<void>;
 }
 
 const KEY = 'bunja-chingu-demo-v1';
 
 export class LocalBackend implements Backend {
+  readonly mode = 'demo' as const;
   private state: State;
   private subs = new Set<() => void>();
   constructor(private clock: () => number = () => Date.now()) {
@@ -28,7 +31,7 @@ export class LocalBackend implements Backend {
   }
   private save() { try { localStorage.setItem(KEY, JSON.stringify(this.state)); } catch { /* 저장소를 못 써도 화면은 동작 */ } }
   getState() { return this.state; }
-  dispatch(cmd: Command): DispatchResult {
+  async dispatch(cmd: Command): Promise<DispatchResult> {
     try {
       const r = apply(this.state, cmd, this.clock());
       this.state = r.state; this.save(); this.subs.forEach((f) => f());
@@ -42,9 +45,49 @@ export class LocalBackend implements Backend {
   reset() { this.state = seedState(this.clock()); this.save(); this.subs.forEach((f) => f()); }
 }
 
+/** 서버와 통신하는 최소 기능. Supabase 클라이언트를 감싸서 테스트에서 바꿔 끼울 수 있게 한다. */
+export interface RemoteTransport {
+  call(body: unknown): Promise<{ status: number; json: Record<string, unknown> }>;
+  onChange(fn: () => void): () => void;
+  signOut(): Promise<void>;
+}
+
 export class RemoteBackend implements Backend {
-  getState(): State { throw new Error('서버 미연결'); }
-  dispatch(): DispatchResult { return { ok: false, error: '서버가 아직 연결되지 않았어요.' }; }
-  subscribe() { return () => {}; }
+  readonly mode = 'live' as const;
+  private state: State | null = null;
+  private subs = new Set<() => void>();
+  private stopWatch: () => void = () => {};
+  private timer: ReturnType<typeof setInterval> | undefined;
+  constructor(private t: RemoteTransport) {}
+
+  /** 처음 한 번 서버에서 내 보기를 받아 오고, 바뀔 때마다 다시 받는다. */
+  async start() {
+    await this.refresh();
+    this.stopWatch = this.t.onChange(() => { this.refresh().catch(() => undefined); });
+    this.timer = setInterval(() => { this.refresh().catch(() => undefined); }, 20_000); // 실시간 연결이 끊겨도 따라잡도록
+  }
+  stop() { this.stopWatch(); clearInterval(this.timer); }
+  async refresh() {
+    const r = await this.t.call({ action: 'view' });
+    if (r.status === 200 && r.json.view) this.set(r.json.view as State);
+    else if (r.status >= 400) throw new Error(String(r.json.error ?? '서버에 연결하지 못했어요.'));
+  }
+  private set(s: State) { this.state = s; this.subs.forEach((f) => f()); }
+  getState(): State {
+    if (!this.state) throw new Error('아직 불러오지 않았어요.');
+    return this.state;
+  }
+  async dispatch(cmd: Command): Promise<DispatchResult> {
+    try {
+      const r = await this.t.call({ action: 'dispatch', cmd });
+      if (r.json.view) this.set(r.json.view as State);
+      if (r.status !== 200) return { ok: false, error: String(r.json.error ?? '서버 오류가 났어요.') };
+      return { ok: !!r.json.ok, error: r.json.error as string | undefined, createdId: r.json.createdId as string | undefined, info: r.json.info as string | undefined };
+    } catch {
+      return { ok: false, error: '인터넷 연결을 확인하고 다시 시도해 주세요.' };
+    }
+  }
+  subscribe(fn: () => void) { this.subs.add(fn); return () => { this.subs.delete(fn); }; }
   reset() {}
+  async signOut() { this.stop(); await this.t.signOut(); }
 }

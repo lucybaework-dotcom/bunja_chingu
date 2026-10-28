@@ -8,7 +8,7 @@ import { complementScore, matchReason, RECOMMEND_CONFIG } from './recommend';
 import { DomainError, type ChatPolicy, type Id, type Proposal, type Room, type State, type Visibility } from './types';
 
 export type Command =
-  | { type: 'createUser'; intro: string; virtual?: boolean; demoLabel?: string; elementId?: ElementId; makeMe?: boolean }
+  | { type: 'createUser'; id?: Id; intro: string; virtual?: boolean; demoLabel?: string; elementId?: ElementId; makeMe?: boolean }
   | { type: 'recordQuiz'; actor: Id; answers: Record<string, number> }
   | { type: 'lockElement'; actor: Id; elementId: ElementId; acknowledged: boolean }
   | { type: 'updateIntro'; actor: Id; intro: string }
@@ -265,7 +265,8 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
 
   switch (cmd.type) {
     case 'createUser': {
-      const id = nid(s, 'u');
+      if (cmd.id && s.users[cmd.id]) fail('이미 가입된 계정이에요.');
+      const id = cmd.id ?? nid(s, 'u');
       const intro = cmd.intro.trim().slice(0, INTRO_MAX);
       s.users[id] = { id, universityId: 'demo-univ', elementId: null, elementLockedAt: null, intro, createdAt: now,
         virtual: !!cmd.virtual, demoLabel: cmd.demoLabel ?? '나' };

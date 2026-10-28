@@ -6,12 +6,15 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:demo": "vite build --mode demo --outDir dist-demo",
+    "build:function": "esbuild function-entry.ts --bundle --format=esm --platform=neutral --target=es2022 --outfile=server-dist/bunja-function.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

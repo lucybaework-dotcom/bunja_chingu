@@ -18,7 +18,7 @@ type View =
   | { k: 'home' } | { k: 'rooms' } | { k: 'create' } | { k: 'auto' } | { k: 'room'; id: string }
   | { k: 'collection' } | { k: 'card'; mol: string } | { k: 'public' } | { k: 'profile' } | { k: 'element'; el: ElementId } | { k: 'table'; el?: string };
 
-interface Ctx { s: State; viewer: string; run: (c: Command, ok?: string) => DispatchResult; go: (v: View) => void; view: View }
+interface Ctx { s: State; viewer: string; run: (c: Command, ok?: string) => Promise<DispatchResult>; go: (v: View) => void; view: View; backend: Backend }
 const C = createContext<Ctx>(null as unknown as Ctx);
 const useApp = () => useContext(C);
 
@@ -40,19 +40,25 @@ export default function App({ backend }: { backend: Backend }) {
   const tRef = useRef<number>();
   useEffect(() => { if (!viewer || !s.users[viewer]) setViewer(s.meId); }, [s.meId, viewer, s.users]);
   const show = (t: string, err?: boolean) => { setToast({ t, err }); window.clearTimeout(tRef.current); tRef.current = window.setTimeout(() => setToast(null), 2800); };
-  const run = (c: Command, ok?: string) => { const r = backend.dispatch(c); if (!r.ok) show(r.error!, true); else if (ok) show(ok); return r; };
+  // 요청은 한 번에 하나씩 순서대로 보낸다 (중복 클릭으로 같은 요청이 겹치지 않게)
+  const chain = useRef<Promise<unknown>>(Promise.resolve());
+  const run = (c: Command, ok?: string): Promise<DispatchResult> => {
+    const p = chain.current.then(() => backend.dispatch(c)).then((r) => { if (!r.ok) show(r.error!, true); else if (ok) show(ok); return r; });
+    chain.current = p.catch(() => undefined);
+    return p;
+  };
   const go = (v: View) => { setView(v); window.scrollTo({ top: 0 }); };
 
   const vid = viewer ?? s.meId;
   const me = vid ? s.users[vid] : null;
   let body: JSX.Element;
-  if (!me) body = <Intro onStart={() => { const r = run({ type: 'createUser', intro: '', makeMe: true }); if (r.ok) setViewer(r.createdId!); }} />;
+  if (!me) body = <Intro onStart={async () => { const r = await run({ type: 'createUser', intro: '', makeMe: true }); if (r.ok) setViewer(r.createdId!); }} />;
   else if (!me.elementLockedAt) body = <Onboarding />;
   else body = <Screen />;
   const onboarded = !!me?.elementLockedAt;
 
   return (
-    <C.Provider value={{ s, viewer: vid ?? '', run, go, view }}>
+    <C.Provider value={{ s, viewer: vid ?? '', run, go, view, backend }}>
       <div className="shell">
         <header className="topbar">
           <button className="brand" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => go({ k: 'home' })}>
@@ -65,7 +71,7 @@ export default function App({ backend }: { backend: Backend }) {
         {body}
       </div>
       {onboarded && <TabBar />}
-      <button className="demo-fab" onClick={() => setDemo(true)}>시연 도구</button>
+      {backend.mode === 'demo' && <button className="demo-fab" onClick={() => setDemo(true)}>시연 도구</button>}
       {demo && <DemoSheet onClose={() => setDemo(false)} setViewer={setViewer} reset={() => { backend.reset(); setViewer(null); go({ k: 'home' }); }} />}
       {toast && <div className={`toast${toast.err ? ' err' : ''}`} role="status">{toast.t}</div>}
     </C.Provider>
@@ -169,7 +175,7 @@ function Onboarding() {
   const { s, viewer, run } = useApp();
   const attempts = s.quizAttempts.filter((a) => a.userId === viewer);
   const [phase, setPhase] = useState<'quiz' | 'choose'>(attempts.length ? 'choose' : 'quiz');
-  if (phase === 'quiz') return <Quiz onDone={(answers) => { const r = run({ type: 'recordQuiz', actor: viewer, answers }); if (r.ok) setPhase('choose'); }} onSkip={attempts.length ? () => setPhase('choose') : undefined} />;
+  if (phase === 'quiz') return <Quiz onDone={async (answers) => { const r = await run({ type: 'recordQuiz', actor: viewer, answers }); if (r.ok) setPhase('choose'); }} onSkip={attempts.length ? () => setPhase('choose') : undefined} />;
   return <Choose onRetake={() => setPhase('quiz')} />;
 }
 
@@ -236,10 +242,10 @@ function Choose({ onRetake }: { onRetake: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const [ack, setAck] = useState(false);
   const [intro, setIntro] = useState(s.users[viewer].intro);
-  const lock = () => {
-    const a = run({ type: 'updateIntro', actor: viewer, intro });
+  const lock = async () => {
+    const a = await run({ type: 'updateIntro', actor: viewer, intro });
     if (!a.ok) return;
-    const r = run({ type: 'lockElement', actor: viewer, elementId: sel, acknowledged: ack }, `${j(ELEMENTS[sel].name, '으로/로')} 확정했어요.`);
+    const r = await run({ type: 'lockElement', actor: viewer, elementId: sel, acknowledged: ack }, `${j(ELEMENTS[sel].name, '으로/로')} 확정했어요.`);
     if (r.ok) go({ k: 'home' });
   };
   return (
@@ -292,8 +298,8 @@ function Home() {
   const myRooms = Object.values(s.rooms).filter((r) => isMember(s, r.id, viewer)).sort((a, b) => b.createdAt - a.createdAt);
   const pastRooms = Object.values(s.rooms).filter((r) => !isMember(s, r.id, viewer) && s.members.some((m) => m.roomId === r.id && m.userId === viewer) && r.closedAt);
   const busy = commit.rooms.length > 0 || commit.queued;
-  const auto = () => {
-    const r = run({ type: 'startAutoMatch', actor: viewer });
+  const auto = async () => {
+    const r = await run({ type: 'startAutoMatch', actor: viewer });
     if (!r.ok) return;
     if (r.info === 'queued') go({ k: 'auto' }); else go({ k: 'room', id: r.createdId! });
   };
@@ -431,7 +437,7 @@ function CreateRoom() {
           {[1, 2, 3, 5, 7].map((d) => <option key={d} value={d}>{d}일</option>)}
         </select>
       </section>
-      <button className="btn primary block" disabled={!mol} onClick={() => { const r = run({ type: 'createRoom', actor: viewer, moleculeId: mol, chatPolicy: policy, recruitDays: days }, '방을 만들었어요.'); if (r.ok) go({ k: 'room', id: r.createdId! }); }}>
+      <button className="btn primary block" disabled={!mol} onClick={async () => { const r = await run({ type: 'createRoom', actor: viewer, moleculeId: mol, chatPolicy: policy, recruitDays: days }, '방을 만들었어요.'); if (r.ok) go({ k: 'room', id: r.createdId! }); }}>
         {mol && moleculeById(mol)!.formula} 방 만들기
       </button>
     </div>
@@ -440,7 +446,7 @@ function CreateRoom() {
 
 // ───────── 7. 자동 매칭 대기 ─────────
 function AutoMatch() {
-  const { s, viewer, run, go } = useApp();
+  const { s, viewer, run, go, backend } = useApp();
   const q = waitingEntry(s, viewer);
   const last = s.queue.filter((x) => x.userId === viewer).at(-1);
   const el = s.users[viewer].elementId!;
@@ -460,8 +466,8 @@ function AutoMatch() {
       <h1>결합할 원자를 찾는 중</h1>
       <p className="muted">{ELEMENTS[el].name} 자리가 있는 모집방이 아직 없어서 대기열에 들어갔어요. 함께 기다리는 사람들로 실제 분자가 만들어지면 바로 방이 열리고 알려 드려요.</p>
       <div className="row small muted" style={{ justifyContent: 'center' }}><span className="mono">대기 {waiting}명</span><span>·</span><span>{fmtTime(q.enteredAt)}부터</span></div>
-      <button className="btn danger" onClick={() => { const r = run({ type: 'cancelAutoMatch', actor: viewer }, '매칭을 취소했어요.'); if (r.ok) go({ k: 'home' }); }}>매칭 취소</button>
-      <p className="small muted">시연 도구에서 가상 사용자를 대기열에 넣어 매칭을 확인할 수 있어요.</p>
+      <button className="btn danger" onClick={async () => { const r = await run({ type: 'cancelAutoMatch', actor: viewer }, '매칭을 취소했어요.'); if (r.ok) go({ k: 'home' }); }}>매칭 취소</button>
+      {backend.mode === 'demo' && <p className="small muted">시연 도구에서 가상 사용자를 대기열에 넣어 매칭을 확인할 수 있어요.</p>}
     </div>
   );
 }
@@ -547,8 +553,8 @@ function RoomDetail({ id }: { id: string }) {
                 : '방을 종료하면 채팅과 모집이 모두 끝나요. 이미 얻은 카드와 만남 기록은 그대로 남아요.'}</p>
               <div className="row">
                 <button className="btn ghost" onClick={() => setConfirmLeave('')}>취소</button>
-                <button className="btn danger grow" onClick={() => {
-                  const ok = confirmLeave === 'leave' ? run({ type: 'leaveRoom', actor: viewer, roomId: id }, '방에서 나왔어요.') : run({ type: 'closeRoom', actor: viewer, roomId: id }, '방을 종료했어요.');
+                <button className="btn danger grow" onClick={async () => {
+                  const ok = await (confirmLeave === 'leave' ? run({ type: 'leaveRoom', actor: viewer, roomId: id }, '방에서 나왔어요.') : run({ type: 'closeRoom', actor: viewer, roomId: id }, '방을 종료했어요.'));
                   setConfirmLeave(''); if (ok.ok && confirmLeave === 'leave') go({ k: 'home' });
                 }}>{confirmLeave === 'leave' ? '나가기' : '종료하기'}</button>
               </div>
@@ -667,7 +673,7 @@ function MeetingPanel({ room }: { room: Room }) {
           <p className="small">판정: {sel.length < 2 ? '두 명 이상 골라 주세요.' : preview ? <strong>{molName(preview.id)} · 카드 지급 대상</strong> : '유효한 분자가 아니에요 · 카드 없이 기록만'}</p>
           <div className="row">
             {picking && <button className="btn ghost" onClick={() => setPicking(false)}>취소</button>}
-            <button className="btn primary grow" disabled={sel.length < 2} onClick={() => { const r = run({ type: 'proposeMeeting', actor: viewer, roomId: room.id, attendeeIds: sel }, '참석 확인을 요청했어요.'); if (r.ok) setPicking(false); }}>참석자에게 확인 요청</button>
+            <button className="btn primary grow" disabled={sel.length < 2} onClick={async () => { const r = await run({ type: 'proposeMeeting', actor: viewer, roomId: room.id, attendeeIds: sel }, '참석 확인을 요청했어요.'); if (r.ok) setPicking(false); }}>참석자에게 확인 요청</button>
           </div>
         </>
       ) : (
@@ -700,7 +706,7 @@ function Chat({ room }: { room: Room }) {
         ))}
       </div>
       {ok ? (
-        <form className="composer" onSubmit={(e) => { e.preventDefault(); const r = run({ type: 'sendMessage', actor: viewer, roomId: room.id, body: txt }); if (r.ok) setTxt(''); }}>
+        <form className="composer" onSubmit={async (e) => { e.preventDefault(); const r = await run({ type: 'sendMessage', actor: viewer, roomId: room.id, body: txt }); if (r.ok) setTxt(''); }}>
           <input id={`chat-${room.id}`} className="input" value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="메시지 보내기" aria-label="메시지" />
           <button className="btn primary" disabled={!txt.trim()}>보내기</button>
         </form>
@@ -818,7 +824,8 @@ function PublicPreview() {
 
 // ───────── 12. 내 정보 ─────────
 function Profile() {
-  const { s, viewer, run, go } = useApp();
+  const { s, viewer, run, go, backend } = useApp();
+  const [out, setOut] = useState(false);
   const me = s.users[viewer];
   const [intro, setIntro] = useState(me.intro);
   const rooms = [...new Set(s.members.filter((m) => m.userId === viewer).map((m) => m.roomId))].map((id) => s.rooms[id]).sort((a, b) => b.createdAt - a.createdAt);
@@ -854,6 +861,7 @@ function Profile() {
         })}
       </section>
       <p className="small muted">{METAPHOR_NOTICE}</p>
+      {backend.signOut && <button className="btn block" disabled={out} onClick={async () => { setOut(true); await backend.signOut!(); location.reload(); }}>로그아웃</button>}
     </div>
   );
 }
@@ -871,24 +879,24 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
   const roomId = view.k === 'room' ? view.id : null;
   const r = roomId ? s.rooms[roomId] : null;
   const users = Object.values(s.users).filter((u) => u.elementLockedAt || !u.virtual);
-  const newVirtual = (el: ElementId) => run({ type: 'createUser', intro: `시연용 ${ELEMENTS[el].name} 친구`, elementId: el, virtual: true, demoLabel: `가상 ${Object.keys(s.users).length + 1} · ${el}` }).createdId!;
-  const fillOne = () => {
+  const newVirtual = async (el: ElementId) => (await run({ type: 'createUser', intro: `시연용 ${ELEMENTS[el].name} 친구`, elementId: el, virtual: true, demoLabel: `가상 ${Object.keys(s.users).length + 1} · ${el}` })).createdId!;
+  const fillOne = async () => {
     if (!r) return;
     const vac = vacancies(moleculeById(r.targetMoleculeId)!.atomCounts, roomCounts(s, r.id));
     const el = Object.keys(vac)[0] as ElementId | undefined;
     if (!el) return;
-    const uid = newVirtual(el);
-    run({ type: 'joinRoom', actor: uid, roomId: r.id }, `가상 ${j(ELEMENTS[el].name, '이/가')} 합류했어요.`);
+    const uid = await newVirtual(el);
+    await run({ type: 'joinRoom', actor: uid, roomId: r.id }, `가상 ${j(ELEMENTS[el].name, '이/가')} 합류했어요.`);
   };
   const p = r ? openProposal(s, r.id) : undefined;
   const pm = r ? pendingMeeting(s, r.id) : undefined;
-  const othersVote = (choice: 'yes' | 'no') => {
+  const othersVote = async (choice: 'yes' | 'no') => {
     if (!p) return;
     const pending = p.electorate.filter((u) => u !== viewer && !p.votes[u]);
     if (choice === 'no') { if (pending[0]) run({ type: 'vote', actor: pending[0], proposalId: p.id, choice: 'no' }); return; }
-    for (const u of pending) run({ type: 'vote', actor: u, proposalId: p.id, choice: 'yes' });
+    for (const u of pending) await run({ type: 'vote', actor: u, proposalId: p.id, choice: 'yes' });
   };
-  const othersConfirm = () => { if (pm) for (const a of pm.attendees) if (a.userId !== viewer && !pm.confirmations[a.userId]) run({ type: 'respondMeeting', actor: a.userId, meetingId: pm.id, response: 'confirm' }); };
+  const othersConfirm = async () => { if (pm) for (const a of pm.attendees) if (a.userId !== viewer && !pm.confirmations[a.userId]) await run({ type: 'respondMeeting', actor: a.userId, meetingId: pm.id, response: 'confirm' }); };
   const hostActs = () => r && r.hostId !== viewer && setViewer(r.hostId);
   return (
     <div className="sheet-bg" onClick={onClose}>
@@ -926,7 +934,7 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
             <select id="queue-el" className="input grow" style={{ width: 'auto' }} value={qEl} onChange={(e) => setQEl(e.target.value as ElementId)} aria-label="원소">
               {usableElements().map((e) => <option key={e} value={e}>{ELEMENTS[e].name} {e}</option>)}
             </select>
-            <button className="btn" onClick={() => { const uid = newVirtual(qEl); run({ type: 'startAutoMatch', actor: uid }, `가상 ${j(ELEMENTS[qEl].name, '이/가')} 자동 매칭을 시작했어요.`); }}>대기열에 넣기</button>
+            <button className="btn" onClick={async () => { const uid = await newVirtual(qEl); run({ type: 'startAutoMatch', actor: uid }, `가상 ${j(ELEMENTS[qEl].name, '이/가')} 자동 매칭을 시작했어요.`); }}>대기열에 넣기</button>
           </div>
         </div>
 
