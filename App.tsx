@@ -1,6 +1,7 @@
+import { j, josaOf } from './josa';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ELEMENTS, METAPHOR_NOTICE, pairContent } from './elements';
-import { moleculeById, type ElementId } from './molecules';
+import { kindLabel, moleculeById, type ElementId } from './molecules';
 import { CONTEXT_LABEL, QUESTIONS, scoreQuiz } from './quiz';
 import type { Backend, DispatchResult } from './backend';
 import { countsOf, exactMatches, moleculesWith, supersetCandidates, usableElements, vacancies } from './chemistry';
@@ -9,7 +10,7 @@ import {
   recruitingCommitments, roomCounts, waitingEntry, type Command,
 } from './engine';
 import type { Room, State } from './types';
-import { PERIODIC, PT_GROUPS } from './periodic';
+import { PERIODIC, PT_GROUPS, PT_PERIODS } from './periodic';
 import { Atom, fmtDate, fmtTime, Formula, Icon, MoleculeStrip, MolTitle } from './bits';
 
 type View =
@@ -237,14 +238,14 @@ function Choose({ onRetake }: { onRetake: () => void }) {
   const lock = () => {
     const a = run({ type: 'updateIntro', actor: viewer, intro });
     if (!a.ok) return;
-    const r = run({ type: 'lockElement', actor: viewer, elementId: sel, acknowledged: ack }, `${ELEMENTS[sel].name}으로 확정했어요.`);
+    const r = run({ type: 'lockElement', actor: viewer, elementId: sel, acknowledged: ack }, `${j(ELEMENTS[sel].name, '으로/로')} 확정했어요.`);
     if (r.ok) go({ k: 'home' });
   };
   return (
     <div className="stack" style={{ gap: 18 }}>
       <div className="stack-s">
         <span className="eyebrow">테스트 결과</span>
-        <h1>추천 원소는 {ELEMENTS[last.recommended].name}이에요</h1>
+        <h1>추천 원소는 {j(ELEMENTS[last.recommended].name, '이에요/예요')}</h1>
         <p className="muted small">다른 원소 설명도 비교해 보고 직접 골라 주세요. 추천과 달라도 괜찮아요.</p>
       </div>
       <div className="el-tabs" role="tablist">
@@ -257,12 +258,12 @@ function Choose({ onRetake }: { onRetake: () => void }) {
       <div className="panel"><ElementDetail el={sel} /></div>
       {!confirming ? (
         <div className="stack-s">
-          <button className="btn primary block" onClick={() => setConfirming(true)}>{ELEMENTS[sel].name}으로 할게요</button>
+          <button className="btn primary block" onClick={() => setConfirming(true)}>{j(ELEMENTS[sel].name, '으로/로')} 할게요</button>
           <button className="btn ghost block" onClick={onRetake}>테스트 다시 보기</button>
         </div>
       ) : (
         <div className="panel warn">
-          <h2>{ELEMENTS[sel].name}을 내 원소로 확정할까요?</h2>
+          <h2>{j(ELEMENTS[sel].name, '을/를')} 내 원소로 확정할까요?</h2>
           <p className="small">확정하면 계정을 유지하는 동안 원소를 바꿀 수 없어요. 바꾸려면 탈퇴 후 다시 가입해야 해요.</p>
           <label className="stack-s" htmlFor="intro-in">
             <span className="small" style={{ fontWeight: 600 }}>한 줄 소개 (방에서 원소와 함께 이것만 보여요)</span>
@@ -399,7 +400,8 @@ function CreateRoom() {
     <div className="stack" style={{ gap: 18 }}>
       <button className="back" onClick={() => go({ k: 'rooms' })}>← 분자방</button>
       <h1>어떤 분자를 만들까요?</h1>
-      <p className="small muted">{ELEMENTS[el].name}이 들어갈 수 있는 분자만 보여요. 나는 방장으로 원자 한 자리를 차지해요.</p>
+      <p className="small muted">이온 결정은 결정 속 화학식 단위의 원자 수만큼 모여요. 예를 들어 소금 NaCl은 2명이에요.</p>
+      <p className="small muted">{j(ELEMENTS[el].name, '이/가')} 들어갈 수 있는 분자만 보여요. 나는 방장으로 원자 한 자리를 차지해요.</p>
       {groups.map((n) => (
         <section key={n} className="stack-s">
           <span className="eyebrow">{n}명</span>
@@ -407,7 +409,7 @@ function CreateRoom() {
             {cands.filter((m) => m.totalAtoms === n).map((m) => (
               <button key={m.id} className={`option${mol === m.id ? ' sel' : ''}`} onClick={() => setMol(m.id)} aria-pressed={mol === m.id}>
                 <div className="row between" style={{ flexWrap: 'nowrap' }}>
-                  <span className="row"><Formula f={m.formula} style={{ fontSize: 18, minWidth: 74 }} /><span>{m.name}</span></span>
+                  <span className="row"><Formula f={m.formula} style={{ fontSize: 18, minWidth: 74 }} /><span>{m.name}</span>{m.kind === 'ionic' && <span className="chip">이온 결정</span>}</span>
                   <MoleculeStrip formula={m.formula} target={m.atomCounts} members={[]} size={18} labels={false} />
                 </div>
               </button>
@@ -572,8 +574,8 @@ function Proposals({ room }: { room: Room }) {
           <span className="eyebrow">{p.reason === 'deadline' ? '모집 마감' : p.reason === 'departure' ? '구성원 이탈' : '구성원 제안'}</span>
           <h2>{p.type === 'earlyComplete' ? '반응을 종결시키겠습니까?' : '목표 분자를 바꿀까요?'}</h2>
           <p className="small">{p.type === 'earlyComplete'
-            ? `지금 모인 구성 그대로 ${molName(p.targetMoleculeId)}로 확정해요.`
-            : `목표를 ${molName(p.targetMoleculeId)}로 바꾸고 남은 자리를 더 모집해요. 지금 있는 사람은 아무도 빠지지 않아요.`}
+            ? `지금 모인 구성 그대로 ${j(molName(p.targetMoleculeId), '으로/로')} 확정해요.`
+            : `목표를 ${j(molName(p.targetMoleculeId), '으로/로')} 바꾸고 남은 자리를 더 모집해요. 지금 있는 사람은 아무도 빠지지 않아요.`}
             {p.reason === 'deadline' && ' 한 명이라도 반대하면 방이 종료돼요.'}</p>
           <div className="stack-s">
             {p.electorate.map((uid) => {
@@ -600,12 +602,12 @@ function Proposals({ room }: { room: Room }) {
               <div className="stack-s">
                 <p className="small"><strong>조기 완성</strong> <span className="muted">지금 모인 원소 구성과 정확히 같은 분자</span></p>
                 {exact.length === 0 && <p className="small muted">지금 구성과 정확히 같은 분자는 없어요.</p>}
-                {exact.map((x) => <button key={x.id} className="btn block" onClick={() => run({ type: 'propose', actor: viewer, roomId: room.id, kind: 'earlyComplete', moleculeId: x.id }, '투표를 열었어요.')}>{x.formula} {x.name}로 반응 종결 제안</button>)}
+                {exact.map((x) => <button key={x.id} className="btn block" onClick={() => run({ type: 'propose', actor: viewer, roomId: room.id, kind: 'earlyComplete', moleculeId: x.id }, '투표를 열었어요.')}>{x.formula} {j(x.name, '으로/로')} 반응 종결 제안</button>)}
               </div>
               <div className="stack-s">
                 <p className="small"><strong>목표 변경</strong> <span className="muted">지금 구성원을 모두 담는 더 큰 분자</span></p>
                 {supers.length === 0 && <p className="small muted">바꿀 수 있는 분자가 없어요.</p>}
-                {supers.slice(0, 6).map((x) => <button key={x.id} className="btn block" onClick={() => run({ type: 'propose', actor: viewer, roomId: room.id, kind: 'retarget', moleculeId: x.id }, '투표를 열었어요.')}>{x.formula} {x.name} ({x.totalAtoms}명)로 바꾸기 제안</button>)}
+                {supers.slice(0, 6).map((x) => <button key={x.id} className="btn block" onClick={() => run({ type: 'propose', actor: viewer, roomId: room.id, kind: 'retarget', moleculeId: x.id }, '투표를 열었어요.')}>{x.formula} {j(`${x.name} (${x.totalAtoms}명)`, '으로/로')} 바꾸기 제안</button>)}
               </div>
               <p className="small muted">현재 구성원 전원이 동의해야 바뀌어요.</p>
             </div>
@@ -633,7 +635,7 @@ function MeetingPanel({ room }: { room: Room }) {
       {pm && !picking ? (
         <>
           <h3>실제 참석 확인</h3>
-          <p className="small">{pm.matchedMoleculeId ? <>참석 구성이 <strong>{molName(pm.matchedMoleculeId)}</strong>이에요. 모두 확인하면 이 카드를 받아요.</> : '참석 구성이 유효한 분자가 아니에요. 모두 확인하면 카드 없이 만남 기록만 남아요.'}</p>
+          <p className="small">{pm.matchedMoleculeId ? <>참석 구성이 <strong>{molName(pm.matchedMoleculeId)}</strong>{josaOf(molName(pm.matchedMoleculeId), '이에요/예요')}. 모두 확인하면 이 카드를 받아요.</> : '참석 구성이 유효한 분자가 아니에요. 모두 확인하면 카드 없이 만남 기록만 남아요.'}</p>
           <div className="stack-s">
             {pm.attendees.map((a) => {
               const c = pm.confirmations[a.userId];
@@ -771,6 +773,7 @@ function CardDetail({ mol }: { mol: string }) {
       <div className="panel" style={{ alignItems: 'flex-start' }}>
         <Formula f={m.formula} className="formula xl" />
         <h2>{m.name}</h2>
+        <span className="chip">{kindLabel(m)}</span>
         <MoleculeStrip formula={m.formula} target={m.atomCounts} members={[]} size={30} labels={false} />
         <p className="small">{m.stabilityNote}</p>
         <p className="small muted mono">{m.sources.join(' · ')} · 처음 얻은 날 {fmtDate(c.firstEarnedAt)}</p>
@@ -874,7 +877,7 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
     const el = Object.keys(vac)[0] as ElementId | undefined;
     if (!el) return;
     const uid = newVirtual(el);
-    run({ type: 'joinRoom', actor: uid, roomId: r.id }, `가상 ${ELEMENTS[el].name}이 합류했어요.`);
+    run({ type: 'joinRoom', actor: uid, roomId: r.id }, `가상 ${j(ELEMENTS[el].name, '이/가')} 합류했어요.`);
   };
   const p = r ? openProposal(s, r.id) : undefined;
   const pm = r ? pendingMeeting(s, r.id) : undefined;
@@ -922,7 +925,7 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
             <select id="queue-el" className="input grow" style={{ width: 'auto' }} value={qEl} onChange={(e) => setQEl(e.target.value as ElementId)} aria-label="원소">
               {usableElements().map((e) => <option key={e} value={e}>{ELEMENTS[e].name} {e}</option>)}
             </select>
-            <button className="btn" onClick={() => { const uid = newVirtual(qEl); run({ type: 'startAutoMatch', actor: uid }, `가상 ${ELEMENTS[qEl].name}이 자동 매칭을 시작했어요.`); }}>대기열에 넣기</button>
+            <button className="btn" onClick={() => { const uid = newVirtual(qEl); run({ type: 'startAutoMatch', actor: uid }, `가상 ${j(ELEMENTS[qEl].name, '이/가')} 자동 매칭을 시작했어요.`); }}>대기열에 넣기</button>
           </div>
         </div>
 
@@ -955,9 +958,9 @@ function PeriodicTable({ initial }: { initial?: string }) {
         <p className="small muted">원소를 눌러 성격 비유와 잘 맞는 원소를 볼 수 있어요. 색이 있는 칸이 지금 분자친구에서 고를 수 있는 원소예요.</p>
       </div>
       <div className="pt-wrap">
-        <div className="pt" role="grid" aria-label="주기율표 1~3주기">
+        <div className="pt" role="grid" aria-label="주기율표 1~4주기 (전형 원소)">
           {PT_GROUPS.map((g) => <span key={`g${g}`} className={`pt-group mono${g === 13 ? ' split' : ''}`} aria-hidden="true">{g}</span>)}
-          {[1, 2, 3].flatMap((period) => PT_GROUPS.map((g) => {
+          {PT_PERIODS.flatMap((period) => PT_GROUPS.map((g) => {
             const c = PERIODIC.find((x) => x.period === period && x.group === g);
             if (!c) return <span key={`${period}-${g}`} className={`pt-empty${g === 13 ? ' split' : ''}`} aria-hidden="true" />;
             const on = usable.includes(c.symbol);
@@ -983,7 +986,7 @@ function PeriodicTable({ initial }: { initial?: string }) {
             <ElementDetail el={el} />
           </div>
           <div className="panel">
-            <div className="section-title"><h3>{ELEMENTS[el].name}이 들어가는 분자</h3><span className="mono small muted">{mols.length}개</span></div>
+            <div className="section-title"><h3>{j(ELEMENTS[el].name, '이/가')} 들어가는 분자·화합물</h3><span className="mono small muted">{mols.length}개</span></div>
             <div className="row">
               {mols.map((m) => <span key={m.id} className="chip" title={m.name}><Formula f={m.formula} className="mono" /> {m.name}</span>)}
             </div>

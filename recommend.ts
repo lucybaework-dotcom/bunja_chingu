@@ -1,3 +1,4 @@
+import { j } from './josa';
 // 보완성 추천 (임시 규칙, 교체 가능). 분자 유효성 판정 이후에만 쓰인다.
 import { ELEMENTS, pairContent } from './elements';
 import type { ElementId } from './molecules';
@@ -34,7 +35,7 @@ export function matchReason(me: ElementId, others: ElementId[]): MatchReason {
   const partner = [...others].sort((a, b) => distance(me, b) - distance(me, a))[0] ?? me;
   const pc = pairContent(me, partner).find((p) => p.kind === 'complement');
   const m = ELEMENTS[me], p = ELEMENTS[partner];
-  const mood = pc ? `${pc.title} · ${pc.body}` : `${m.name}과 ${p.name}, 서로 다른 속도가 만나는 자리예요.`;
+  const mood = pc ? `${pc.title} · ${pc.body}` : `${j(m.name, '과/와')} ${p.name}, 서로 다른 속도가 만나는 자리예요.`;
   const behavior = me === partner
     ? `같은 ${m.name}끼리: "${m.strengths[0]}" 성향이 겹치니 역할을 나눠 맡아 보세요.`
     : `${p.name}: "${p.strengths[0]}" / 나(${m.name}): "${m.strengths[1]}"`;

@@ -3,9 +3,11 @@
 // 실제 서비스 전에는 담당자가 출처를 확인하고 status를 'approved'로 바꾸는 절차가 필요하다.
 // 매칭 규칙은 isUsable()만 보므로, 검수 정책이 정해지면 그 함수 하나만 바꾸면 된다.
 
-export type ElementId = 'H' | 'C' | 'N' | 'O' | 'F' | 'Si' | 'P' | 'S' | 'Cl';
+export type ElementId = 'H' | 'C' | 'N' | 'O' | 'F' | 'Na' | 'Mg' | 'Al' | 'Si' | 'P' | 'S' | 'Cl' | 'K';
 export type AtomCounts = Partial<Record<ElementId, number>>;
 export type MoleculeStatus = 'approved' | 'candidate' | 'pending';
+/** 'molecule' = 실제 분자, 'ionic' = 이온 결정의 화학식 단위 (분자가 아님. 사용자 결정으로 2026-10-28 허용) */
+export type CompoundKind = 'molecule' | 'ionic';
 
 export interface Molecule {
   id: string;
@@ -17,6 +19,7 @@ export interface Molecule {
   stabilityNote: string;
   sources: string[];
   status: MoleculeStatus;
+  kind?: CompoundKind;
 }
 
 type Raw = Omit<Molecule, 'totalAtoms'>;
@@ -76,15 +79,37 @@ const RAW: Raw[] = [
   { id: 'cs2', name: '이황화 탄소', formula: 'CS₂', atomCounts: { C: 1, S: 2 }, structureKey: 'S=C=S', stabilityNote: '상온에서 안정한 선형 액체 분자. 인화성.', sources: [pc(6348)], status: 'candidate' },
   { id: 'ocs', name: '황화 카보닐', formula: 'OCS', atomCounts: { O: 1, C: 1, S: 1 }, structureKey: 'O=C=S', stabilityNote: '상온에서 안정한 선형 기체 분자.', sources: [pc(10039)], status: 'candidate' },
   { id: 'ch3sh', name: '메테인싸이올', formula: 'CH₃SH', atomCounts: { C: 1, H: 4, S: 1 }, structureKey: 'CS', stabilityNote: '상온에서 존재하는 기체 분자. 강한 냄새.', sources: [pc(878)], status: 'candidate' },
+  // 이온 화합물: 결정 속 화학식 단위 기준으로 인원을 센다 (독립 분자가 아님)
+  { id: 'nacl', kind: 'ionic', name: '염화 소듐', formula: 'NaCl', atomCounts: { Na: 1, Cl: 1 }, structureKey: 'ionic:NaCl', stabilityNote: '소금. 상온에서 안정한 이온 결정.', sources: [pc(5234)], status: 'candidate' },
+  { id: 'kcl', kind: 'ionic', name: '염화 포타슘', formula: 'KCl', atomCounts: { K: 1, Cl: 1 }, structureKey: 'ionic:KCl', stabilityNote: '상온에서 안정한 이온 결정 (저나트륨 소금).', sources: [pc(4873)], status: 'candidate' },
+  { id: 'naf', kind: 'ionic', name: '플루오린화 소듐', formula: 'NaF', atomCounts: { Na: 1, F: 1 }, structureKey: 'ionic:NaF', stabilityNote: '상온에서 안정한 이온 결정 (치약 불소 성분).', sources: [pc(5235)], status: 'candidate' },
+  { id: 'kf', kind: 'ionic', name: '플루오린화 포타슘', formula: 'KF', atomCounts: { K: 1, F: 1 }, structureKey: 'ionic:KF', stabilityNote: '상온에서 안정한 이온 결정. 습기를 잘 흡수함.', sources: [pc(522689)], status: 'candidate' },
+  { id: 'mgo', kind: 'ionic', name: '산화 마그네슘', formula: 'MgO', atomCounts: { Mg: 1, O: 1 }, structureKey: 'ionic:MgO', stabilityNote: '상온에서 매우 안정한 이온 결정.', sources: [pc(14792)], status: 'candidate' },
+  { id: 'mgf2', kind: 'ionic', name: '플루오린화 마그네슘', formula: 'MgF₂', atomCounts: { Mg: 1, F: 2 }, structureKey: 'ionic:MgF2', stabilityNote: '상온에서 안정한 이온 결정 (렌즈 코팅).', sources: [pc(24546)], status: 'candidate' },
+  { id: 'mgcl2', kind: 'ionic', name: '염화 마그네슘', formula: 'MgCl₂', atomCounts: { Mg: 1, Cl: 2 }, structureKey: 'ionic:MgCl2', stabilityNote: '상온에서 안정한 이온 결정 (두부 간수 성분).', sources: ['PubChem: magnesium chloride (번호 확인 필요)'], status: 'candidate' },
+  { id: 'naoh', kind: 'ionic', name: '수산화 소듐', formula: 'NaOH', atomCounts: { Na: 1, O: 1, H: 1 }, structureKey: 'ionic:NaOH', stabilityNote: '상온에서 안정한 이온 결정. 강한 염기, 부식성.', sources: [pc(14798)], status: 'candidate' },
+  { id: 'koh', kind: 'ionic', name: '수산화 포타슘', formula: 'KOH', atomCounts: { K: 1, O: 1, H: 1 }, structureKey: 'ionic:KOH', stabilityNote: '상온에서 안정한 이온 결정. 강한 염기, 부식성.', sources: [pc(14797)], status: 'candidate' },
+  { id: 'na2s', kind: 'ionic', name: '황화 소듐', formula: 'Na₂S', atomCounts: { Na: 2, S: 1 }, structureKey: 'ionic:Na2S', stabilityNote: '건조한 조건에서 안정한 이온 결정. 습기와 반응함.', sources: [pc(237873)], status: 'candidate' },
+  { id: 'alf3', kind: 'ionic', name: '플루오린화 알루미늄', formula: 'AlF₃', atomCounts: { Al: 1, F: 3 }, structureKey: 'ionic:AlF3', stabilityNote: '상온에서 안정한 결정.', sources: [pc(2124)], status: 'candidate' },
+  { id: 'alcl3', kind: 'ionic', name: '염화 알루미늄', formula: 'AlCl₃', atomCounts: { Al: 1, Cl: 3 }, structureKey: 'ionic:AlCl3', stabilityNote: '건조한 조건에서 안정한 결정. 습기와 반응함.', sources: [pc(24012)], status: 'candidate' },
+  { id: 'al2o3', kind: 'ionic', name: '산화 알루미늄', formula: 'Al₂O₃', atomCounts: { Al: 2, O: 3 }, structureKey: 'ionic:Al2O3', stabilityNote: '매우 안정한 결정 (사파이어·루비의 주성분).', sources: ['PubChem: aluminum oxide (번호 확인 필요)'], status: 'candidate' },
+  { id: 'mgco3', kind: 'ionic', name: '탄산 마그네슘', formula: 'MgCO₃', atomCounts: { Mg: 1, C: 1, O: 3 }, structureKey: 'ionic:MgCO3', stabilityNote: '상온에서 안정한 이온 결정 (체육용 초크).', sources: [pc(11029)], status: 'candidate' },
+  { id: 'nano3', kind: 'ionic', name: '질산 소듐', formula: 'NaNO₃', atomCounts: { Na: 1, N: 1, O: 3 }, structureKey: 'ionic:NaNO3', stabilityNote: '상온에서 안정한 이온 결정.', sources: [pc(24268)], status: 'candidate' },
+  { id: 'kno3', kind: 'ionic', name: '질산 포타슘', formula: 'KNO₃', atomCounts: { K: 1, N: 1, O: 3 }, structureKey: 'ionic:KNO3', stabilityNote: '상온에서 안정한 이온 결정 (초석).', sources: [pc(24434)], status: 'candidate' },
+  { id: 'nahco3', kind: 'ionic', name: '탄산수소 소듐', formula: 'NaHCO₃', atomCounts: { Na: 1, H: 1, C: 1, O: 3 }, structureKey: 'ionic:NaHCO3', stabilityNote: '베이킹소다. 상온에서 안정한 이온 결정.', sources: [pc(516892)], status: 'candidate' },
+  { id: 'na2co3', kind: 'ionic', name: '탄산 소듐', formula: 'Na₂CO₃', atomCounts: { Na: 2, C: 1, O: 3 }, structureKey: 'ionic:Na2CO3', stabilityNote: '상온에서 안정한 이온 결정 (세탁 소다).', sources: [pc(10340)], status: 'candidate' },
+  { id: 'k2co3', kind: 'ionic', name: '탄산 포타슘', formula: 'K₂CO₃', atomCounts: { K: 2, C: 1, O: 3 }, structureKey: 'ionic:K2CO3', stabilityNote: '상온에서 안정한 이온 결정. 습기를 잘 흡수함.', sources: [pc(11430)], status: 'candidate' },
 ];
 
-export const ELEMENT_ORDER: ElementId[] = ['H', 'C', 'N', 'O', 'F', 'Si', 'P', 'S', 'Cl'];
+export const ELEMENT_ORDER: ElementId[] = ['H', 'C', 'N', 'O', 'F', 'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'K'];
 
 export function total(c: AtomCounts): number {
   return ELEMENT_ORDER.reduce((s, e) => s + (c[e] ?? 0), 0);
 }
 
-export const MOLECULES: Molecule[] = RAW.map((m) => ({ ...m, totalAtoms: total(m.atomCounts) }));
+export const MOLECULES: Molecule[] = RAW.map((m) => ({ kind: 'molecule' as const, ...m, totalAtoms: total(m.atomCounts) }));
+
+export const kindLabel = (m: Molecule) => (m.kind === 'ionic' ? '이온 결정 · 화학식 단위' : '분자');
 
 /** 매칭·카드에 쓸 수 있는 분자인지. 프로토타입 기본안: 시범 후보까지 허용, 보류는 제외. */
 export function isUsable(m: Molecule): boolean {

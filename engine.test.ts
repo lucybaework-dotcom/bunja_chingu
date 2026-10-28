@@ -6,6 +6,7 @@ import { QUESTIONS } from './quiz';
 import type { ElementId } from './molecules';
 import type { State } from './types';
 import { seedState } from './seed';
+import { j } from './josa';
 
 function harness() {
   let s: State = emptyState(); let t = 1_000_000;
@@ -44,6 +45,30 @@ describe('화학 카탈로그', () => {
   });
   it('사용 가능한 원소는 카탈로그에 실제로 등장하는 원소뿐', () => {
     expect(usableElements()).toEqual(ELEMENT_ORDER.filter((e) => USABLE().some((m) => m.atomCounts[e])));
+  });
+});
+
+describe('조사 선택', () => {
+  it('받침에 맞는 조사를 고른다', () => {
+    expect(j('수소', '으로/로')).toBe('수소로'); expect(j('인', '으로/로')).toBe('인으로');
+    expect(j('물(H₂O)', '으로/로')).toBe('물(H₂O)로'); expect(j('황', '이/가')).toBe('황이');
+    expect(j('산소', '이/가')).toBe('산소가'); expect(j('플루오린', '을/를')).toBe('플루오린을');
+    expect(j('규소', '을/를')).toBe('규소를'); expect(j('탄소', '과/와')).toBe('탄소와');
+    expect(j('질소', '이에요/예요')).toBe('질소예요'); expect(j('염소(Cl)', '이/가')).toBe('염소(Cl)가');
+    expect(j('메테인 (5명)', '으로/로')).toBe('메테인 (5명)으로');
+  });
+});
+
+describe('이온 화합물', () => {
+  it('Na, Mg, Al, K가 쓰이고 이온 화합물로 표시된다', () => {
+    for (const e of ['Na', 'Mg', 'Al', 'K'] as ElementId[]) expect(usableElements()).toContain(e);
+    expect(exactMatches(countsOf(['Na', 'Cl'])).map((m) => [m.id, m.kind])).toEqual([['nacl', 'ionic']]);
+    expect(exactMatches(countsOf(['Al', 'Al', 'O', 'O', 'O']))[0].id).toBe('al2o3');
+    expect(exactMatches(countsOf(['Na', 'H', 'C', 'O', 'O', 'O']))[0].id).toBe('nahco3');
+    expect(MOLECULES.filter((m) => m.kind === 'molecule').length).toBeGreaterThan(40);
+  });
+  it('같은 1족끼리(Na+K)는 화합물이 없다', () => {
+    expect(exactMatches(countsOf(['Na', 'K']))).toEqual([]);
   });
 });
 

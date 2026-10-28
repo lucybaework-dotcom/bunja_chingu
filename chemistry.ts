@@ -49,7 +49,7 @@ export function usableElements(): ElementId[] {
 
 /** 슬롯 목록: 목표 분자의 원자 자리를 원소 순서대로 펼친다. */
 export function slotsOf(target: AtomCounts, formula?: string): ElementId[] {
-  const order = formula ? [...new Set([...formula.matchAll(/Cl|Si|[A-Z]/g)].map((m) => m[0] as ElementId))] : [];
+  const order = formula ? [...new Set([...formula.matchAll(/[A-Z][a-z]?/g)].map((m) => m[0] as ElementId))] : [];
   const seq = [...order, ...ELEMENT_ORDER.filter((e) => !order.includes(e))];
   return seq.flatMap((e) => Array.from({ length: target[e] ?? 0 }, () => e));
 }

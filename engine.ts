@@ -1,3 +1,4 @@
+import { j } from './josa';
 // 상태 전이 규칙 (순수 함수). 실제 서비스에서는 같은 규칙을 서버에서 원자적으로 실행해야 한다.
 import { ELEMENTS } from './elements';
 import { moleculeById, USABLE, type ElementId } from './molecules';
@@ -117,8 +118,8 @@ function addMember(s: State, roomId: Id, uid: Id, via: 'create' | 'join' | 'auto
     reason: via === 'auto' && others.length ? matchReason(u.elementId, others) : undefined });
   voidOpenProposals(s, roomId, now);
   if (via !== 'create') {
-    sys(s, roomId, `${ELEMENTS[u.elementId].name}(${u.elementId})이 합류했어요.`, now);
-    if (canChat(s, roomId, uid)) notifyRoom(s, roomId, `${molName(r.targetMoleculeId)} 방에 ${ELEMENTS[u.elementId].name}이 합류했어요.`, now, uid);
+    sys(s, roomId, `${j(`${ELEMENTS[u.elementId].name}(${u.elementId})`, '이/가')} 합류했어요.`, now);
+    if (canChat(s, roomId, uid)) notifyRoom(s, roomId, `${molName(r.targetMoleculeId)} 방에 ${j(ELEMENTS[u.elementId].name, '이/가')} 합류했어요.`, now, uid);
   }
   checkComplete(s, roomId, now);
 }
@@ -129,7 +130,7 @@ function checkComplete(s: State, roomId: Id, now: number) {
   if (sameCounts(moleculeById(r.targetMoleculeId)!.atomCounts, roomCounts(s, roomId))) {
     r.recruitment = 'complete'; r.completedAt = now;
     voidOpenProposals(s, roomId, now);
-    sys(s, roomId, `${molName(r.targetMoleculeId)}이 완성됐어요. 채팅에서 첫 만남 날짜와 장소를 정해 보세요.`, now);
+    sys(s, roomId, `${j(molName(r.targetMoleculeId), '이/가')} 완성됐어요. 채팅에서 첫 만남 날짜와 장소를 정해 보세요.`, now);
     notifyRoom(s, roomId, `${molName(r.targetMoleculeId)} 분자가 완성됐어요.`, now);
   }
 }
@@ -150,8 +151,8 @@ function openProposalInternal(s: State, roomId: Id, type: Proposal['type'], reas
   const p: Proposal = { id: nid(s, 'p'), roomId, type, reason, targetMoleculeId: moleculeId, proposedBy: by, electorate,
     votes: {}, status: 'open', createdAt: now, expiresAt: now + s.config.proposalHours * HOUR };
   s.proposals.push(p);
-  const text = type === 'earlyComplete' ? `반응을 종결시키겠습니까? 지금 구성으로 ${molName(moleculeId)}을 확정하는 투표가 열렸어요.`
-    : `목표를 ${molName(moleculeId)}로 바꾸는 투표가 열렸어요.`;
+  const text = type === 'earlyComplete' ? `반응을 종결시키겠습니까? 지금 구성으로 ${j(molName(moleculeId), '을/를')} 확정하는 투표가 열렸어요.`
+    : `목표를 ${j(molName(moleculeId), '으로/로')} 바꾸는 투표가 열렸어요.`;
   sys(s, roomId, text, now);
   notifyRoom(s, roomId, text, now);
   return p;
@@ -317,7 +318,7 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       if (r.closedAt) fail('이미 종료된 방이에요.');
       const wasComplete = r.recruitment === 'complete';
       mem.leftAt = now; // 이탈 이력은 삭제하지 않는다.
-      sys(s, r.id, `${ELEMENTS[mem.elementSnapshot].name}(${mem.elementSnapshot})이 방을 나갔어요.`, now);
+      sys(s, r.id, `${j(`${ELEMENTS[mem.elementSnapshot].name}(${mem.elementSnapshot})`, '이/가')} 방을 나갔어요.`, now);
       voidOpenProposals(s, r.id, now);
       const pm = pendingMeeting(s, r.id);
       if (pm && pm.attendees.some((a) => a.userId === cmd.actor)) {
@@ -390,7 +391,7 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
           sys(s, r.id, `전원 동의로 반응이 종결됐어요.`, now);
           checkComplete(s, r.id, now);
         } else {
-          sys(s, r.id, `전원 동의로 목표가 ${molName(m.id)}로 바뀌었어요. 남은 자리를 모집해요.`, now);
+          sys(s, r.id, `전원 동의로 목표가 ${j(molName(m.id), '으로/로')} 바뀌었어요. 남은 자리를 모집해요.`, now);
           checkComplete(s, r.id, now);
         }
       }

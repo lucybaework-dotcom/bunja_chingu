@@ -22,6 +22,10 @@
   --atom-Si: #d9b48a; --atom-Si-ink: #17232c;
   --atom-P: #f08a1c; --atom-P-ink: #17232c;
   --atom-S: #ecc81c; --atom-S-ink: #17232c;
+  --atom-Na: #9a52e0; --atom-Na-ink: #ffffff;
+  --atom-Mg: #3fb6a8; --atom-Mg-ink: #17232c;
+  --atom-Al: #b9a2a6; --atom-Al-ink: #17232c;
+  --atom-K: #6a32b0; --atom-K-ink: #ffffff;
   --atom-ring: #17232c;
   --f-display: 'Do Hyeon', 'IBM Plex Sans KR', system-ui, sans-serif;
   --f-body: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
@@ -33,7 +37,7 @@
     --bg: #0f171c; --surface: #172329; --surface-2: #213139; --ink: #e6eef2; --ink-2: #9fb1bb; --line: #2f424c;
     --accent: #5fc4cc; --accent-ink: #062226; --accent-soft: #163a3f; --warn: #f0a868; --warn-soft: #3a2a19;
     --bad: #f2867e; --ok: #77c98c;
-    --atom-H: #eef2f4; --atom-C: #59626d; --atom-N: #5c84f0; --atom-O: #e5574c; --atom-Cl: #45b35f; --atom-F: #9be36a; --atom-Si: #e2c19c; --atom-P: #f59a35; --atom-S: #f2d43a; --atom-ring: #9fb1bb;
+    --atom-H: #eef2f4; --atom-C: #59626d; --atom-N: #5c84f0; --atom-O: #e5574c; --atom-Cl: #45b35f; --atom-F: #9be36a; --atom-Si: #e2c19c; --atom-P: #f59a35; --atom-S: #f2d43a; --atom-Na: #b072f0; --atom-Mg: #52c9bb; --atom-Al: #c9b4b8; --atom-K: #8a55d0; --atom-ring: #9fb1bb;
     color-scheme: dark;
   }
 }
@@ -41,7 +45,7 @@
   --bg: #0f171c; --surface: #172329; --surface-2: #213139; --ink: #e6eef2; --ink-2: #9fb1bb; --line: #2f424c;
   --accent: #5fc4cc; --accent-ink: #062226; --accent-soft: #163a3f; --warn: #f0a868; --warn-soft: #3a2a19;
   --bad: #f2867e; --ok: #77c98c;
-  --atom-H: #eef2f4; --atom-C: #59626d; --atom-N: #5c84f0; --atom-O: #e5574c; --atom-Cl: #45b35f; --atom-F: #9be36a; --atom-Si: #e2c19c; --atom-P: #f59a35; --atom-S: #f2d43a; --atom-ring: #9fb1bb;
+  --atom-H: #eef2f4; --atom-C: #59626d; --atom-N: #5c84f0; --atom-O: #e5574c; --atom-Cl: #45b35f; --atom-F: #9be36a; --atom-Si: #e2c19c; --atom-P: #f59a35; --atom-S: #f2d43a; --atom-Na: #b072f0; --atom-Mg: #52c9bb; --atom-Al: #c9b4b8; --atom-K: #8a55d0; --atom-ring: #9fb1bb;
   color-scheme: dark;
 }
 
@@ -104,6 +108,10 @@ p { margin: 0; }
 .atom.el-Si { --c: var(--atom-Si); --i: var(--atom-Si-ink); }
 .atom.el-P { --c: var(--atom-P); --i: var(--atom-P-ink); }
 .atom.el-S { --c: var(--atom-S); --i: var(--atom-S-ink); }
+.atom.el-Na { --c: var(--atom-Na); --i: var(--atom-Na-ink); }
+.atom.el-Mg { --c: var(--atom-Mg); --i: var(--atom-Mg-ink); }
+.atom.el-Al { --c: var(--atom-Al); --i: var(--atom-Al-ink); }
+.atom.el-K { --c: var(--atom-K); --i: var(--atom-K-ink); }
 .atom.empty { background: transparent; color: var(--ink-2); border-style: dashed; border-color: var(--ink-2); }
 .atom.me::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--accent); }
 
@@ -204,6 +212,10 @@ textarea.input { resize: vertical; }
 .pt-cell.on.el-Si { --c: var(--atom-Si); --i: var(--atom-Si-ink); }
 .pt-cell.on.el-P { --c: var(--atom-P); --i: var(--atom-P-ink); }
 .pt-cell.on.el-S { --c: var(--atom-S); --i: var(--atom-S-ink); }
+.pt-cell.on.el-Na { --c: var(--atom-Na); --i: var(--atom-Na-ink); }
+.pt-cell.on.el-Mg { --c: var(--atom-Mg); --i: var(--atom-Mg-ink); }
+.pt-cell.on.el-Al { --c: var(--atom-Al); --i: var(--atom-Al-ink); }
+.pt-cell.on.el-K { --c: var(--atom-K); --i: var(--atom-K-ink); }
 .pt-cell.sel { outline: 3px solid var(--accent); outline-offset: 1px; }
 .pt-cell.big { width: 56px; flex: none; cursor: default; }
 .pt-key { display: inline-block; width: 14px; height: 14px; border-radius: 4px; border: 1px dashed var(--ink-2); }

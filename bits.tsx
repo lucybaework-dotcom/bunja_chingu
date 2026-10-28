@@ -45,7 +45,7 @@ export function MolTitle({ id, big }: { id: string; big?: boolean }) {
   return (
     <div className="stack-s" style={{ gap: 2 }}>
       <Formula f={m.formula} className={`formula${big ? ' xl' : ''}`} />
-      <span className="muted small">{m.name} · {m.totalAtoms}명</span>
+      <span className="muted small">{m.name} · {m.totalAtoms}명{m.kind === 'ionic' ? ' · 이온 결정' : ''}</span>
     </div>
   );
 }
