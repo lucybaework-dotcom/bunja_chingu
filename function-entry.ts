@@ -13,8 +13,9 @@ const rest = (path: string, init: RequestInit = {}) => fetch(`${URL_}/rest/v1/${
 
 const deps: Deps = {
   async getUser(token) {
-    const r = await fetch(`${URL_}/auth/v1/user`, { headers: { apikey: SERVICE, Authorization: `Bearer ${token}` } });
-    if (!r.ok) return null;
+    const key = Deno.env.get('SUPABASE_ANON_KEY') || SERVICE;
+    const r = await fetch(`${URL_}/auth/v1/user`, { headers: { apikey: key, Authorization: `Bearer ${token}` } });
+    if (!r.ok) { console.error('auth/v1/user', r.status, await r.text().catch(() => '')); return null; }
     const u = await r.json();
     return u?.id ? { id: u.id, email: u.email ?? '' } : null;
   },

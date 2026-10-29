@@ -77,7 +77,7 @@ export class RemoteBackend implements Backend {
     const h = this.here();
     const r = await this.t.call({ action: 'view', ...(h ? { here: { lat: h.lat, lng: h.lng } } : {}) });
     if (r.status === 200 && r.json.view) this.set(r.json.view as State);
-    else if (r.status >= 400) throw new Error(String(r.json.error ?? '서버에 연결하지 못했어요.'));
+    else if (r.status >= 400) throw Object.assign(new Error(String(r.json.error ?? '서버에 연결하지 못했어요.')), { status: r.status });
   }
   private set(s: State) { this.state = s; this.subs.forEach((f) => f()); }
   getState(): State {

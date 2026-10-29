@@ -21,6 +21,7 @@ export default function AuthGate() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [backend, setBackend] = useState<RemoteBackend | null>(null);
   const [loadErr, setLoadErr] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     const sb = supabase();
@@ -33,12 +34,28 @@ export default function AuthGate() {
     if (!session) { backend?.stop(); setBackend(null); return; }
     if (backend) return;
     const b = new RemoteBackend(supabaseTransport(), lastKnown);
-    b.start().then(() => setBackend(b)).catch((e: Error) => setLoadErr(e.message));
+    b.start().then(() => setBackend(b)).catch(async (e: Error & { status?: number }) => {
+      b.stop();
+      if (e.status === 401) {
+        // 지워진 계정이거나 오래된 로그인 정보: 이 기기의 로그인 정보를 지우고 로그인 화면으로
+        await supabase().auth.signOut({ scope: 'local' }).catch(() => undefined);
+        setNotice('로그인이 만료됐어요. 다시 로그인해 주세요.');
+        setSession(null);
+        return;
+      }
+      setLoadErr(e.message);
+    });
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (session === undefined) return <Center>불러오는 중…</Center>;
-  if (!session) return <Login />;
-  if (loadErr) return <Center><p>{loadErr}</p><button className="btn" onClick={() => location.reload()}>다시 시도</button></Center>;
+  if (!session) return <Login notice={notice} />;
+  if (loadErr) return (
+    <Center>
+      <p>{loadErr}</p>
+      <button className="btn" onClick={() => location.reload()}>다시 시도</button>
+      <button className="btn ghost" onClick={async () => { await supabase().auth.signOut({ scope: 'local' }).catch(() => undefined); location.reload(); }}>로그아웃하고 다시 로그인</button>
+    </Center>
+  );
   if (!backend) return <Center>내 실험실을 불러오는 중…</Center>;
   return <App backend={backend} />;
 }
@@ -47,7 +64,7 @@ function Center({ children }: { children: React.ReactNode }) {
   return <div className="shell" style={{ alignItems: 'center', textAlign: 'center', paddingTop: 80 }}><div className="stack" style={{ alignItems: 'center' }}>{children}</div></div>;
 }
 
-function Login() {
+function Login({ notice }: { notice?: string }) {
   const [mode, setMode] = useState<'in' | 'up'>('in');
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
@@ -74,6 +91,7 @@ function Login() {
         <h1>분자친구</h1>
         <p className="muted">나를 닮은 원소로, 실제 분자만큼 모여 친구가 돼요.</p>
       </section>
+      {notice && !msg && <div className="panel warn"><p className="small">{notice}</p></div>}
       <form className="panel" onSubmit={submit}>
         <div className="seg" role="tablist">
           <button type="button" className={mode === 'in' ? 'on' : ''} onClick={() => setMode('in')}>로그인</button>
