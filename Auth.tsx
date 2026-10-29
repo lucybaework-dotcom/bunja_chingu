@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import { RemoteBackend } from './backend';
 import { supabase, supabaseTransport } from './supabase';
 import App from './App';
+import { lastKnown } from './geo';
 import { Atom } from './bits';
 
 const KO: [RegExp, string][] = [
@@ -31,7 +32,7 @@ export default function AuthGate() {
   useEffect(() => {
     if (!session) { backend?.stop(); setBackend(null); return; }
     if (backend) return;
-    const b = new RemoteBackend(supabaseTransport());
+    const b = new RemoteBackend(supabaseTransport(), lastKnown);
     b.start().then(() => setBackend(b)).catch((e: Error) => setLoadErr(e.message));
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 

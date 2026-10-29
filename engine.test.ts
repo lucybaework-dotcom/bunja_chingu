@@ -9,9 +9,16 @@ import { seedState } from './seed';
 import { j } from './josa';
 import { elementColor, inkContrast } from './colors';
 
+const HERE = { lat: 37.6110, lng: 126.9968, acc: 20 };
+/** 예전 테스트가 새 필수 입력(실험실 이름, 만남 확인 위치)을 몰라도 돌아가게 기본값을 채운다 */
+export function withDefaults(cmd: Command): Command {
+  if (cmd.type === 'createRoom' && !cmd.name) return { ...cmd, name: '테스트 실험실' };
+  if (cmd.type === 'respondMeeting' && cmd.response === 'confirm' && cmd.loc === undefined) return { ...cmd, loc: HERE };
+  return cmd;
+}
 function harness() {
   let s: State = emptyState(); let t = 1_000_000;
-  const run = (cmd: Command) => { const r = apply(s, cmd, (t += 1000)); s = r.state; return r; };
+  const run = (cmd: Command) => { const r = apply(s, withDefaults(cmd), (t += 1000)); s = r.state; return r; };
   const tryRun = (cmd: Command) => { try { run(cmd); return null; } catch (e) { return (e as Error).message; } };
   const user = (el: ElementId, intro = `${el} 사람`) => run({ type: 'createUser', intro, elementId: el, virtual: true }).createdId!;
   return { get s() { return s; }, run, tryRun, user };

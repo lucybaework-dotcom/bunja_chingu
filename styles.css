@@ -212,3 +212,106 @@ textarea.input { resize: vertical; }
 .chat-badge { position: absolute; top: -6px; right: -4px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--bg); }
 .chat-sheet { height: min(86vh, 720px); }
 .chat-sheet .chat { max-height: none; min-height: 0; flex: 1; }
+
+/* ───── 튕기는 버튼 ───── */
+.boing { animation: boing .42s cubic-bezier(.3,1.7,.5,1); }
+@keyframes boing { 0% { transform: scale(1); } 22% { transform: scale(.9); } 55% { transform: scale(1.06); } 78% { transform: scale(.98); } 100% { transform: scale(1); } }
+
+/* ───── 공통 조각 ───── */
+.chip.pick { cursor: pointer; font-size: 13px; padding: 5px 11px; }
+.chip.pick:disabled { opacity: .45; cursor: not-allowed; }
+.meter { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.meter > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--ok)); border-radius: 4px; transition: width .4s; }
+.switch { width: 52px; height: 30px; border-radius: 999px; border: none; background: var(--surface-2); position: relative; cursor: pointer; flex: none; box-shadow: inset 0 0 0 1px var(--line); }
+.switch span { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .3); transition: transform .2s cubic-bezier(.3,1.5,.5,1); }
+.switch.on { background: var(--accent); }
+.switch.on span { transform: translateX(22px); }
+button.memberline { background: none; border: none; padding: 4px 0; text-align: left; width: 100%; cursor: pointer; color: inherit; font: inherit; align-items: center; }
+button.memberline:disabled { cursor: default; }
+.room-name { font-size: 16px; overflow-wrap: anywhere; }
+.room-title { font-size: 26px; overflow-wrap: anywhere; }
+details summary { cursor: pointer; }
+
+/* ───── 카드 받기 배너 ───── */
+.claim-banner { flex-direction: row; align-items: center; gap: 14px; cursor: pointer; text-align: left; border-color: var(--accent); background: var(--accent-soft); }
+.claim-pack { width: 40px; height: 56px; border-radius: 6px; flex: none; background: repeating-linear-gradient(45deg, var(--accent) 0 6px, var(--surface) 6px 12px); box-shadow: 0 4px 10px rgb(0 0 0 / .2); animation: wiggle 1.8s ease-in-out infinite; }
+@keyframes wiggle { 0%, 70%, 100% { transform: rotate(0); } 76% { transform: rotate(-8deg); } 84% { transform: rotate(7deg); } 92% { transform: rotate(-4deg); } }
+.claim-panel { border-color: var(--accent); }
+.claim-btn { animation: glow 1.6s ease-in-out infinite; }
+@keyframes glow { 0%, 100% { box-shadow: 0 0 0 0 rgb(15 110 120 / .45); } 50% { box-shadow: 0 0 0 8px rgb(15 110 120 / 0); } }
+
+/* ───── 실제 카드 ───── */
+.tcard { --rx: 0deg; --ry: 0deg; --gx: 50%; --gy: 30%; width: 100%; max-width: 320px; margin: 0 auto; aspect-ratio: 5 / 7; perspective: 1000px; transform: rotateX(var(--rx)) rotateY(var(--ry)); transition: transform .15s ease-out; }
+.tcard-inner { all: unset; display: block; position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .7s cubic-bezier(.3,1.25,.5,1); cursor: pointer; border-radius: 18px; }
+.tcard-inner:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.tcard-inner.flipped { transform: rotateY(180deg); }
+.tcard-face { position: absolute; inset: 0; border-radius: 18px; padding: 7px; backface-visibility: hidden; -webkit-backface-visibility: hidden; background: var(--foil); box-shadow: 0 14px 30px rgb(0 0 0 / .28), 0 2px 6px rgb(0 0 0 / .2); overflow: hidden; }
+.tcard-back { transform: rotateY(180deg); }
+.tcard-body { height: 100%; border-radius: 12px; background: var(--surface); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.tcard-top { font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--ink-2); flex-wrap: nowrap; }
+.tcard-title { display: flex; flex-direction: column; gap: 0; }
+.tcard-title .formula { font-size: 34px; line-height: 1.05; }
+.tcard-name { font-family: var(--f-display); font-size: 20px; }
+.tcard-art { flex: 1; min-height: 0; border-radius: 10px; background: radial-gradient(circle at 50% 40%, var(--surface-2), var(--surface) 75%); display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); overflow: hidden; }
+.tcard-art .mol3d { width: 100%; }
+.tcard-atoms { display: flex; gap: 10px; flex-wrap: wrap; }
+.tcard-note { font-size: 11px; color: var(--ink-2); line-height: 1.4; }
+.tcard-rec { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.tcard-shine { position: absolute; inset: 0; border-radius: 18px; pointer-events: none; background: radial-gradient(circle at var(--gx) var(--gy), rgb(255 255 255 / .35), transparent 45%); mix-blend-mode: soft-light; }
+.tcard-backart { height: 100%; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; color: #fff; background: radial-gradient(circle at 50% 40%, #1b8a95, #0b4f57 70%), repeating-linear-gradient(45deg, transparent 0 10px, rgb(255 255 255 / .06) 10px 20px); background-blend-mode: overlay; }
+.tcard-brand { font-family: var(--f-display); font-size: 28px; letter-spacing: .04em; }
+.mol3d.bare canvas { background: transparent; }
+
+/* ───── 도감 ───── */
+.dex-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 520px) { .dex-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.dex { position: relative; aspect-ratio: 5 / 7; border-radius: 10px; border: none; padding: 8px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; cursor: pointer; min-width: 0; color: var(--ink); }
+.dex.owned { background: var(--foil); box-shadow: 0 4px 10px rgb(0 0 0 / .18); }
+.dex.owned::before { content: ""; position: absolute; inset: 4px; border-radius: 7px; background: var(--surface); z-index: 0; }
+.dex > * { position: relative; z-index: 1; }
+.dex.locked { background: var(--surface-2); border: 1.5px dashed var(--line); color: var(--ink-2); }
+.dex.locked:disabled { cursor: default; }
+.dex-no { position: absolute; top: 6px; left: 8px; font-size: 10px; color: var(--ink-2); }
+.dex-f { font-size: 17px; }
+.dex.locked .dex-f { opacity: .55; }
+.dex-name { font-size: 11px; line-height: 1.25; overflow-wrap: anywhere; }
+.dex-meta { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 4px; }
+.dex-lock { width: 16px; height: 16px; opacity: .6; }
+.dex-fit { font-size: 10px; font-weight: 700; color: var(--accent); }
+
+/* ───── 넘겨 보기 ───── */
+.carousel { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 18px 9%; margin: 0 -16px; scrollbar-width: none; }
+.carousel::-webkit-scrollbar { display: none; }
+.carousel-slot { flex: 0 0 82%; scroll-snap-align: center; transition: transform .3s, opacity .3s; transform: scale(.92); opacity: .6; }
+.carousel-slot.cur { transform: none; opacity: 1; }
+
+/* ───── 카드 받기 연출 ───── */
+.reveal-bg { position: fixed; inset: 0; z-index: 40; background: radial-gradient(circle at 50% 45%, rgb(15 40 46 / .92), rgb(5 12 15 / .97)); display: flex; align-items: center; justify-content: center; padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px)); }
+.reveal { position: relative; width: min(320px, 82vw); display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.reveal-hint { color: #e6eef2; font-weight: 700; animation: fadeup .4s both; }
+.reveal-card { width: 100%; cursor: pointer; }
+.stage-pack .reveal-card { animation: pack-shake 1.3s ease-in-out infinite; }
+.stage-burst .reveal-card { animation: pack-pop .65s cubic-bezier(.3,1.6,.5,1) both; }
+.stage-show .reveal-card { animation: card-land .5s cubic-bezier(.3,1.4,.5,1) both; }
+.reveal-text { width: 100%; text-align: center; color: #e6eef2; animation: fadeup .5s .25s both; }
+.reveal-text .btn.primary { margin-top: 6px; }
+@keyframes pack-shake { 0%, 60%, 100% { transform: rotate(0) scale(1); } 66% { transform: rotate(-5deg) scale(1.02); } 74% { transform: rotate(5deg) scale(1.03); } 82% { transform: rotate(-3deg) scale(1.02); } 90% { transform: rotate(2deg); } }
+@keyframes pack-pop { 0% { transform: scale(1); filter: brightness(1); } 40% { transform: scale(.85) rotate(-4deg); filter: brightness(1.6); } 100% { transform: scale(1.08); filter: brightness(2.2); } }
+@keyframes card-land { from { transform: scale(1.1); } to { transform: none; } }
+@keyframes fadeup { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.sparks { position: absolute; left: 50%; top: 42%; width: 0; height: 0; pointer-events: none; }
+.spark { position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid rgb(255 255 255 / .7); left: -7px; top: -7px; animation: spark .9s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes spark { from { transform: rotate(var(--a)) translateY(0) scale(.4); opacity: 1; } to { transform: rotate(var(--a)) translateY(calc(-1 * var(--d))) scale(1); opacity: 0; } }
+
+/* ───── 지도 ───── */
+.mapbox { width: 100%; height: 340px; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); z-index: 0; }
+.pin-wrap { background: none; border: none; }
+.pin { width: 40px; height: 40px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--c); border: 2.5px solid #fff; box-shadow: 0 4px 10px rgb(0 0 0 / .35); display: flex; align-items: center; justify-content: center; margin-left: 2px; animation: pin-drop .5s cubic-bezier(.3,1.6,.5,1) both; }
+.pin span { transform: rotate(45deg); color: var(--i); font-family: var(--f-mono); font-weight: 700; font-size: 14px; }
+.pin-label { margin-top: 2px; text-align: center; font: 700 11px var(--f-mono); color: #17232c; background: #fff; border-radius: 6px; padding: 0 4px; box-shadow: 0 1px 3px rgb(0 0 0 / .3); white-space: nowrap; }
+@keyframes pin-drop { from { transform: rotate(-45deg) translate(0, -24px); opacity: 0; } to { transform: rotate(-45deg); opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .boing, .claim-pack, .claim-btn, .stage-pack .reveal-card, .stage-burst .reveal-card, .stage-show .reveal-card, .reveal-text, .pin, .spark { animation: none !important; }
+  .tcard, .tcard-inner, .carousel-slot, .switch span { transition: none; }
+}

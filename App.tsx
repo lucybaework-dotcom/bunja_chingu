@@ -6,20 +6,40 @@ import { CONTEXT_LABEL, QUESTIONS, scoreQuiz } from './quiz';
 import type { Backend, DispatchResult } from './backend';
 import { countsOf, exactMatches, moleculesWith, supersetCandidates, usableElements, vacancies } from './chemistry';
 import {
-  activeMembers, canChat, hasConflict, INTRO_MAX, isMember, isRecruitingOpen, joinableRoomsFor, openProposal, pendingMeeting,
-  recruitingCommitments, roomCounts, waitingEntry, type Command,
+  activeMembers, canChat, getProfile, hasConflict, INTRO_MAX, isMember, isRecruitingOpen, joinableRoomsFor, openProposal, pendingMeeting,
+  recruitingCommitments, roomCounts, roomTitle, ROOM_NAME_MAX, waitingEntry, type Command,
 } from './engine';
-import type { Room, State } from './types';
+import type { MeetingRecord, Room, State } from './types';
+import { USABLE } from './molecules';
+import { CardCarousel, CardReveal, DexTile } from './CardUI';
+import { AdminView, NicknameInput, ProfileSheet, ReactionMeter, ReviewSheet, TagPicker } from './Social';
+import Nearby from './Nearby';
+import { getLocation, getSimulated, isDemoGeo, setDemoGeo, setSimulated, watchLocation } from './geo';
+import { CAMPUS } from './campus';
 import { PERIODIC, PT_GROUPS, PT_PERIODS } from './periodic';
 import { elementColor } from './colors';
 import Molecule3D from './Molecule3D';
-import { Atom, fmtDate, fmtTime, Formula, Icon, MoleculeStrip, MolTitle } from './bits';
+import { Atom, fmtDate, fmtTime, Formula, Icon, MoleculeStrip } from './bits';
 
 type View =
   | { k: 'home' } | { k: 'rooms' } | { k: 'create' } | { k: 'auto' } | { k: 'room'; id: string }
-  | { k: 'collection' } | { k: 'card'; mol: string } | { k: 'public' } | { k: 'profile' } | { k: 'element'; el: ElementId } | { k: 'table'; el?: string };
+  | { k: 'collection' } | { k: 'card'; mol: string } | { k: 'public' } | { k: 'profile' } | { k: 'element'; el: ElementId } | { k: 'table'; el?: string }
+  | { k: 'nearby' } | { k: 'admin' };
 
-interface Ctx { s: State; viewer: string; run: (c: Command, ok?: string) => Promise<DispatchResult>; go: (v: View) => void; view: View; backend: Backend }
+interface Ctx {
+  s: State; viewer: string; run: (c: Command, ok?: string) => Promise<DispatchResult>; go: (v: View) => void; view: View; backend: Backend;
+  openProfile: (uid: string, roomId?: string) => void; openReveal: (recordId: string) => void; openReview: (meetingId: string) => void; now: number;
+}
+
+/** 내 카드 상태: 받은 카드(받기를 누름)와 받기 대기 중인 기록 */
+export function myCards(s: State, uid: string) {
+  const recs = s.records.filter((r) => r.userId === uid && r.moleculeId);
+  const owned = new Set(recs.filter((r) => r.claimedAt).map((r) => r.moleculeId!));
+  const pending = recs.filter((r) => !r.claimedAt);
+  return { owned, pending, recordsOf: (id: string) => recs.filter((r) => r.moleculeId === id && r.claimedAt).sort((a, b) => b.createdAt - a.createdAt) };
+}
+const isAdminView = (s: State, uid: string) => s.admins.includes(uid) || !!(s as State & { isAdmin?: boolean }).isAdmin;
+const nickOf = (s: State, viewer: string, uid: string) => getProfile(s, viewer, uid)?.nickname || s.users[uid]?.nickname || '';
 const C = createContext<Ctx>(null as unknown as Ctx);
 const useApp = () => useContext(C);
 
@@ -49,9 +69,42 @@ export default function App({ backend }: { backend: Backend }) {
     return p;
   };
   const go = (v: View) => { setView(v); window.scrollTo({ top: 0 }); };
+  useMemo(() => setDemoGeo(backend.mode === 'demo'), [backend.mode]);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t); }, []);
+  const [profileOf, setProfileOf] = useState<{ uid: string; roomId?: string } | null>(null);
+  const [reveal, setReveal] = useState<string | null>(null);
+  const [reviewOf, setReviewOf] = useState<string | null>(null);
+
+  // 버튼을 누르면 튕기는 효과 (동작 줄이기 설정이면 끔)
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const down = (e: PointerEvent) => {
+      const b = (e.target as HTMLElement)?.closest?.('button, .chip.pick, .option, .tab') as HTMLElement | null;
+      if (!b || (b as HTMLButtonElement).disabled || b.closest('.tcard, .pt-cell, .mapbox')) return;
+      b.classList.remove('boing'); void b.offsetWidth; b.classList.add('boing');
+    };
+    const end = (e: AnimationEvent) => { if (e.animationName === 'boing') (e.target as HTMLElement).classList.remove('boing'); };
+    document.addEventListener('pointerdown', down); document.addEventListener('animationend', end);
+    return () => { document.removeEventListener('pointerdown', down); document.removeEventListener('animationend', end); };
+  }, []);
 
   const vid = viewer ?? s.meId;
   const me = vid ? s.users[vid] : null;
+
+  // 방장 위치 공유: 켜져 있는 동안 위치가 바뀌면 서버에 마지막 위치만 보낸다
+  const sharing = !!me?.sharingLocation;
+  useEffect(() => {
+    if (!sharing || !vid) return;
+    let lastSent = 0; let lastLoc: { lat: number; lng: number } | null = null;
+    return watchLocation((r) => {
+      if (!r.ok) { show(r.error, true); return; }
+      const moved = !lastLoc || Math.hypot((r.loc.lat - lastLoc.lat) * 111_000, (r.loc.lng - lastLoc.lng) * 88_000) > 20;
+      if (!moved && Date.now() - lastSent < 60_000) return;
+      lastSent = Date.now(); lastLoc = r.loc;
+      void backend.dispatch({ type: 'setLocation', actor: vid, loc: r.loc }).then((x) => { if (x.info === 'offCampus') show('캠퍼스를 벗어나서 위치 공유를 껐어요.'); });
+    });
+  }, [sharing, vid]); // eslint-disable-line react-hooks/exhaustive-deps
   let body: JSX.Element;
   if (!me) body = <Intro onStart={async () => { const r = await run({ type: 'createUser', intro: '', makeMe: true }); if (r.ok) setViewer(r.createdId!); }} />;
   else if (!me.elementLockedAt) body = <Onboarding />;
@@ -59,7 +112,8 @@ export default function App({ backend }: { backend: Backend }) {
   const onboarded = !!me?.elementLockedAt;
 
   return (
-    <C.Provider value={{ s, viewer: vid ?? '', run, go, view, backend }}>
+    <C.Provider value={{ s, viewer: vid ?? '', run, go, view, backend, now,
+      openProfile: (uid, roomId) => setProfileOf({ uid, roomId }), openReveal: setReveal, openReview: setReviewOf }}>
       <div className="shell">
         <header className="topbar">
           <button className="brand" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => go({ k: 'home' })}>
@@ -74,6 +128,14 @@ export default function App({ backend }: { backend: Backend }) {
       {onboarded && <TabBar />}
       {backend.mode === 'demo' && <button className="demo-fab" onClick={() => setDemo(true)}>시연 도구</button>}
       {demo && <DemoSheet onClose={() => setDemo(false)} setViewer={setViewer} reset={() => { backend.reset(); setViewer(null); go({ k: 'home' }); }} />}
+      {profileOf && vid && <ProfileSheet s={s} viewer={vid} uid={profileOf.uid} roomId={profileOf.roomId} run={run} onClose={() => setProfileOf(null)} />}
+      {reviewOf && vid && <ReviewSheet s={s} viewer={vid} meetingId={reviewOf} run={run} onClose={() => setReviewOf(null)} />}
+      {reveal && vid && (() => {
+        const rec = s.records.find((r) => r.id === reveal);
+        if (!rec) return null;
+        return <CardReveal record={rec} onClaim={async () => (await run({ type: 'claimCard', actor: vid, recordId: rec.id })).ok}
+          onClose={() => { setReveal(null); const mt = s.meetings.find((m) => m.id === rec.meetingId); if (mt && mt.attendees.some((a) => a.userId !== vid && !s.reviews.some((x) => x.meetingId === mt.id && x.from === vid && x.to === a.userId))) setReviewOf(mt.id); }} />;
+      })()}
       {toast && <div className={`toast${toast.err ? ' err' : ''}`} role="status">{toast.t}</div>}
     </C.Provider>
   );
@@ -93,6 +155,8 @@ function Screen() {
     case 'profile': return <Profile />;
     case 'element': return <ElementPage el={view.el} />;
     case 'table': return <PeriodicTable initial={view.el} />;
+    case 'nearby': return <NearbyScreen />;
+    case 'admin': return <AdminScreen />;
   }
 }
 
@@ -243,7 +307,11 @@ function Choose({ onRetake }: { onRetake: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const [ack, setAck] = useState(false);
   const [intro, setIntro] = useState(s.users[viewer].intro);
+  const [nick, setNick] = useState(s.users[viewer].nickname ?? '');
+  const [tags, setTags] = useState<string[]>(s.users[viewer].tags ?? []);
   const lock = async () => {
+    const n = await run({ type: 'updateProfile', actor: viewer, nickname: nick, tags });
+    if (!n.ok) return;
     const a = await run({ type: 'updateIntro', actor: viewer, intro });
     if (!a.ok) return;
     const r = await run({ type: 'lockElement', actor: viewer, elementId: sel, acknowledged: ack }, `${j(ELEMENTS[sel].name, '으로/로')} 확정했어요.`);
@@ -273,15 +341,17 @@ function Choose({ onRetake }: { onRetake: () => void }) {
         <div className="panel warn">
           <h2>{j(ELEMENTS[sel].name, '을/를')} 내 원소로 확정할까요?</h2>
           <p className="small">확정하면 계정을 유지하는 동안 원소를 바꿀 수 없어요. 바꾸려면 탈퇴 후 다시 가입해야 해요.</p>
+          <NicknameInput id="nick-in" value={nick} onChange={setNick} />
           <label className="stack-s" htmlFor="intro-in">
-            <span className="small" style={{ fontWeight: 600 }}>한 줄 소개 (실험실에서 원소와 함께 이것만 보여요)</span>
+            <span className="small" style={{ fontWeight: 600 }}>한 줄 소개 (실험실 목록에서 원소와 함께 보여요)</span>
             <input id="intro-in" className="input" maxLength={INTRO_MAX} value={intro} onChange={(e) => setIntro(e.target.value)} placeholder="예: 조용한 카페에서 수다 떠는 거 좋아해요" />
             <span className="small muted mono">{intro.length}/{INTRO_MAX}</span>
           </label>
+          <TagPicker value={tags} onChange={setTags} />
           <label className="check" htmlFor="ack-in"><input id="ack-in" type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /><span className="small">원소를 다시 바꿀 수 없다는 걸 이해했어요.</span></label>
           <div className="row">
             <button className="btn ghost" onClick={() => setConfirming(false)}>다시 고를래요</button>
-            <button className="btn primary grow" disabled={!ack || !intro.trim()} onClick={lock}>확정하기</button>
+            <button className="btn primary grow" disabled={!ack || !intro.trim() || nick.trim().length < 2} onClick={lock}>확정하기</button>
           </div>
         </div>
       )}
@@ -291,14 +361,16 @@ function Choose({ onRetake }: { onRetake: () => void }) {
 
 // ───────── 4. 홈 ─────────
 function Home() {
-  const { s, viewer, run, go } = useApp();
+  const { s, viewer, run, go, openReveal } = useApp();
   const me = s.users[viewer];
   const el = me.elementId!;
   const commit = recruitingCommitments(s, viewer);
   const conflict = hasConflict(s, viewer);
   const myRooms = Object.values(s.rooms).filter((r) => isMember(s, r.id, viewer)).sort((a, b) => b.createdAt - a.createdAt);
   const pastRooms = Object.values(s.rooms).filter((r) => !isMember(s, r.id, viewer) && s.members.some((m) => m.roomId === r.id && m.userId === viewer) && r.closedAt);
-  const busy = commit.rooms.length > 0 || commit.queued;
+  const busy = commit.rooms.length > 0 || commit.queued || !!me.suspendedAt || !me.nickname;
+  const { pending } = myCards(s, viewer);
+  const [nick, setNick] = useState('');
   const auto = async () => {
     const r = await run({ type: 'startAutoMatch', actor: viewer });
     if (!r.ok) return;
@@ -310,22 +382,40 @@ function Home() {
         <Atom el={el} size={60} />
         <div className="stack-s grow">
           <span className="eyebrow">나의 원소</span>
-          <h2>{ELEMENTS[el].name} <span className="mono muted" style={{ fontSize: 15 }}>{el}</span></h2>
+          <h2>{me.nickname || ELEMENTS[el].name} <span className="mono muted" style={{ fontSize: 15 }}>{ELEMENTS[el].name} {el}</span></h2>
           <p className="small muted">“{me.intro}”</p>
         </div>
       </div>
+      {!me.nickname && (
+        <form className="panel warn" onSubmit={async (e) => { e.preventDefault(); await run({ type: 'updateProfile', actor: viewer, nickname: nick }, '닉네임을 정했어요.'); }}>
+          <h3>닉네임을 정해 주세요</h3>
+          <p className="small">같은 실험실 사람들에게 보이는 이름이에요. 정해야 실험실에 들어갈 수 있어요.</p>
+          <NicknameInput id="home-nick" value={nick} onChange={setNick} />
+          <button className="btn primary" disabled={nick.trim().length < 2}>정하기</button>
+        </form>
+      )}
+      {me.suspendedAt && <div className="panel warn"><h3>이용이 잠시 정지됐어요</h3><p className="small">신고가 쌓여 관리자가 확인하는 중이에요. 확인이 끝나면 알림으로 알려 드려요.</p></div>}
+      {pending.length > 0 && (
+        <button className="panel claim-banner" onClick={() => openReveal(pending[0].id)}>
+          <span className="claim-pack" aria-hidden="true" />
+          <span className="stack-s grow" style={{ gap: 2, textAlign: 'left' }}><strong>받을 분자 카드가 {pending.length}장 있어요</strong><span className="small muted">눌러서 카드를 열어 보세요</span></span>
+        </button>
+      )}
       {conflict && (
         <div className="panel warn">
           <h3>모집 중인 실험실이 두 곳 겹쳐 있어요</h3>
           <p className="small">첫 만남 전에 다시 모집을 시작한 실험실이 있어요. 모집 중인 실험실은 한 곳만 남길 수 있어요. 남길 실험실을 골라 주세요. 고르지 않은 실험실에서는 나가게 돼요.</p>
           {commit.rooms.map((rid) => (
-            <button key={rid} className="btn block" onClick={() => run({ type: 'resolveConflict', actor: viewer, keepRoomId: rid }, '한 곳만 남겼어요.')}>{molName(s.rooms[rid].targetMoleculeId)} 실험실에 남기</button>
+            <button key={rid} className="btn block" onClick={() => run({ type: 'resolveConflict', actor: viewer, keepRoomId: rid }, '한 곳만 남겼어요.')}>‘{roomTitle(s.rooms[rid])}’에 남기</button>
           ))}
         </div>
       )}
       <div className="stack-s">
         <button className="btn primary block" disabled={busy} onClick={auto}>자동 매칭 시작</button>
-        <button className="btn block" onClick={() => go({ k: 'rooms' })}>실험실 직접 찾기</button>
+        <div className="row">
+          <button className="btn grow" onClick={() => go({ k: 'rooms' })}>실험실 직접 찾기</button>
+          <button className="btn grow" onClick={() => go({ k: 'nearby' })}>내 주변 원자 찾기</button>
+        </div>
         {commit.queued && <button className="btn ghost block" onClick={() => go({ k: 'auto' })}>자동 매칭 대기 중 · 상태 보기</button>}
         {!commit.queued && commit.rooms.length > 0 && !conflict && <p className="small muted">모집 중인 실험실이 있어서 새 모집에 참여할 수 없어요. 모집 중인 실험실은 한 곳만 참여할 수 있어요.</p>}
       </div>
@@ -335,7 +425,7 @@ function Home() {
         {myRooms.map((r) => <RoomCard key={r.id} room={r} compact />)}
         {pastRooms.length > 0 && <p className="small muted">종료됐거나 나온 실험실 {pastRooms.length}곳은 내 정보에서 볼 수 있어요.</p>}
       </section>
-      <button className="btn ghost block" onClick={() => go({ k: 'collection' })}>내 분자 컬렉션 · 카드 {s.cards.filter((c) => c.userId === viewer).length}장</button>
+      <button className="btn ghost block" onClick={() => go({ k: 'collection' })}>내 분자 도감 · {myCards(s, viewer).owned.size}/{USABLE().length}</button>
     </div>
   );
 }
@@ -351,7 +441,10 @@ function RoomCard({ room, compact }: { room: Room; compact?: boolean }) {
   return (
     <button className="panel roomcard" onClick={() => go({ k: 'room', id: room.id })}>
       <div className="row between" style={{ alignItems: 'flex-start' }}>
-        <MolTitle id={room.targetMoleculeId} />
+        <div className="stack-s grow" style={{ gap: 2, minWidth: 0 }}>
+          <strong className="room-name">{room.name || <span className="muted">이름 없는 실험실</span>}</strong>
+          <span className="small muted"><Formula f={m.formula} className="mono" /> {m.name} · {m.totalAtoms}명{m.kind === 'ionic' ? ' · 이온 결정' : ''}{room.meetAt ? ` · ${fmtTime(room.meetAt)}` : ''}</span>
+        </div>
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <span className={`chip ${st.cls}`}>{st.label}</span>
           {compact && isMember(s, room.id, viewer) && unreadCount(s, viewer, room.id) > 0 && <span className="chip on">새 메시지 {unreadCount(s, viewer, room.id)}</span>}
@@ -404,11 +497,23 @@ function CreateRoom() {
   const [mol, setMol] = useState(cands[0]?.id ?? '');
   const [policy, setPolicy] = useState<'immediate' | 'afterComplete'>('immediate');
   const [days, setDays] = useState(s.config.defaultRecruitDays);
+  const [name, setName] = useState('');
+  const [when, setWhen] = useState('');
   const groups = [...new Set(cands.map((m) => m.totalAtoms))];
   return (
     <div className="stack" style={{ gap: 18 }}>
       <button className="back" onClick={() => go({ k: 'rooms' })}>← 실험실</button>
-      <h1>어떤 분자를 만들까요?</h1>
+      <h1>새 실험실 열기</h1>
+      <section className="stack-s">
+        <label htmlFor="room-name"><h3>실험실 이름 (필수)</h3></label>
+        <input id="room-name" className="input" maxLength={ROOM_NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 2시에 밥 먹을 사람" />
+        <span className="small muted mono">{name.trim().length}/{ROOM_NAME_MAX}</span>
+      </section>
+      <section className="stack-s">
+        <label htmlFor="room-when"><h3>모이는 시각 (선택)</h3></label>
+        <input id="room-when" className="input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+      </section>
+      <h2>어떤 분자를 만들까요?</h2>
       <p className="small muted">이온 결정은 결정 속 화학식 단위의 원자 수만큼 모여요. 예를 들어 소금 NaCl은 2명이에요.</p>
       <p className="small muted">{j(ELEMENTS[el].name, '이/가')} 들어갈 수 있는 분자만 보여요. 나는 방장으로 원자 한 자리를 차지해요.</p>
       {groups.map((n) => (
@@ -442,8 +547,8 @@ function CreateRoom() {
           {[1, 2, 3, 5, 7].map((d) => <option key={d} value={d}>{d}일</option>)}
         </select>
       </section>
-      <button className="btn primary block" disabled={!mol} onClick={async () => { const r = await run({ type: 'createRoom', actor: viewer, moleculeId: mol, chatPolicy: policy, recruitDays: days }, '실험실을 만들었어요.'); if (r.ok) go({ k: 'room', id: r.createdId! }); }}>
-        {mol && moleculeById(mol)!.formula} 실험실 만들기
+      <button className="btn primary block" disabled={!mol || name.trim().length < 2} onClick={async () => { const r = await run({ type: 'createRoom', actor: viewer, moleculeId: mol, chatPolicy: policy, recruitDays: days, name, meetAt: when ? new Date(when).getTime() : null }, '실험실을 만들었어요.'); if (r.ok) go({ k: 'room', id: r.createdId! }); }}>
+        {name.trim().length < 2 ? '실험실 이름을 먼저 정해 주세요' : `${moleculeById(mol)?.formula ?? ''} 실험실 만들기`}
       </button>
     </div>
   );
@@ -479,7 +584,7 @@ function AutoMatch() {
 
 // ───────── 8~9. 실험실 상세 ─────────
 function RoomDetail({ id }: { id: string }) {
-  const { s, viewer, run, go } = useApp();
+  const { s, viewer, run, go, openProfile } = useApp();
   const r = s.rooms[id];
   const [confirmLeave, setConfirmLeave] = useState<'' | 'leave' | 'close'>('');
   if (!r) return <p>실험실을 찾을 수 없어요.</p>;
@@ -496,12 +601,19 @@ function RoomDetail({ id }: { id: string }) {
     <div className="stack" style={{ gap: 16 }}>
       <button className="back" onClick={() => go({ k: member ? 'home' : 'rooms' })}>← {member ? '홈' : '실험실'}</button>
       <div className="row between" style={{ alignItems: 'flex-start' }}>
-        <MolTitle id={r.targetMoleculeId} big />
+        <div className="stack-s grow" style={{ gap: 4, minWidth: 0 }}>
+          <h1 className="room-title">{r.name || '이름 없는 실험실'}</h1>
+          <span className="row small muted" style={{ gap: 6 }}><Formula f={m.formula} className="mono" /> {m.name} · {m.totalAtoms}명{m.kind === 'ionic' ? ' · 이온 결정' : ''}</span>
+          {r.meetAt && <span className="chip on" style={{ alignSelf: 'flex-start' }}>모이는 시각 {fmtTime(r.meetAt)}</span>}
+        </div>
         <div className="stack-s" style={{ alignItems: 'flex-end' }}>
           <span className={`chip ${st.cls}`}>{st.label}</span>
           {r.origin === 'automatic' && <span className="chip">자동 매칭 실험실</span>}
         </div>
       </div>
+      {member && r.hostId === viewer && !r.closedAt && <RoomInfoEditor room={r} />}
+      {member && <ClaimPanel room={r} />}
+      {member && r.hostId === viewer && !r.closedAt && r.firstMeetingConfirmedAt === null && <LocationShare />}
       {r.originalMoleculeId !== r.targetMoleculeId && <p className="small muted">처음 목표는 {molName(r.originalMoleculeId)}였어요.</p>}
       {r.firstMeetingConfirmedAt && (
         <p className="small">첫 만남 결과: {r.firstMeetingMoleculeId ? <strong>{molName(r.firstMeetingMoleculeId)} 카드 획득</strong> : '유효한 분자가 아니어서 카드 없이 기록만 남았어요'}</p>
@@ -514,19 +626,29 @@ function RoomDetail({ id }: { id: string }) {
         )}
         <div className="stack-s">
           {mems.map((mm) => (
-            <div key={mm.userId} className="memberline">
+            <button key={mm.userId} type="button" className="memberline" disabled={!member} onClick={() => openProfile(mm.userId, id)} aria-label={member ? `${nickOf(s, viewer, mm.userId) || ELEMENTS[mm.elementSnapshot].name} 프로필 보기` : undefined}>
               <Atom el={mm.elementSnapshot} size={30} me={mm.userId === viewer} />
               <div className="who grow stack-s" style={{ gap: 0 }}>
                 <span className="row small" style={{ gap: 6 }}>
-                  <strong>{ELEMENTS[mm.elementSnapshot].name}</strong>
+                  <strong>{member && nickOf(s, viewer, mm.userId) ? nickOf(s, viewer, mm.userId) : ELEMENTS[mm.elementSnapshot].name}</strong>
+                  {member && nickOf(s, viewer, mm.userId) && <span className="muted">{ELEMENTS[mm.elementSnapshot].name}</span>}
                   {mm.userId === r.hostId && <span className="chip">방장</span>}
                   {mm.userId === viewer && <span className="chip on">나</span>}
                 </span>
                 <span className="small" style={{ overflowWrap: 'anywhere' }}>{s.users[mm.userId].intro}</span>
               </div>
-            </div>
+              {member && <span className="small muted" aria-hidden="true">프로필 ›</span>}
+            </button>
           ))}
         </div>
+        {member && (() => {
+          const gone = [...new Set(s.members.filter((x) => x.roomId === id && x.leftAt !== null && !mems.some((y) => y.userId === x.userId)).map((x) => x.userId))];
+          return gone.length > 0 && !r.closedAt ? (
+            <details className="small"><summary className="muted">나간 사람 {gone.length}명</summary>
+              <div className="row" style={{ gap: 6, marginTop: 6 }}>{gone.map((uid) => <button key={uid} className="chip pick" onClick={() => openProfile(uid, id)}>{nickOf(s, viewer, uid) || '이름 없음'}</button>)}</div>
+            </details>
+          ) : null;
+        })()}
         {myMem?.reason && (
           <div className="pair complement"><p className="small"><strong>자동 매칭 추천 이유</strong></p><p className="small">{myMem.reason.mood}</p><p className="small muted">{myMem.reason.behavior}</p></div>
         )}
@@ -594,7 +716,7 @@ function Proposals({ room }: { room: Room }) {
             {p.electorate.map((uid) => {
               const mm = s.members.find((x) => x.roomId === room.id && x.userId === uid)!;
               const v = p.votes[uid];
-              return <div key={uid} className="row small"><Atom el={mm.elementSnapshot} size={20} /><span className="grow">{uid === viewer ? '나' : s.users[uid].intro}</span><span className={`chip ${v === 'yes' ? 'ok' : v === 'no' ? 'bad' : ''}`}>{v === 'yes' ? '동의' : v === 'no' ? '반대' : '응답 대기'}</span></div>;
+              return <div key={uid} className="row small"><Atom el={mm.elementSnapshot} size={20} /><span className="grow">{uid === viewer ? '나' : nickOf(s, viewer, uid) || s.users[uid].intro}</span><span className={`chip ${v === 'yes' ? 'ok' : v === 'no' ? 'bad' : ''}`}>{v === 'yes' ? '동의' : v === 'no' ? '반대' : '응답 대기'}</span></div>;
             })}
           </div>
           <p className="small muted mono">응답 기한 {fmtTime(p.expiresAt)}</p>
@@ -638,6 +760,7 @@ function MeetingPanel({ room }: { room: Room }) {
   const isHost = room.hostId === viewer;
   const mems = activeMembers(s, room.id);
   const [picking, setPicking] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [sel, setSel] = useState<string[]>(mems.map((m) => m.userId));
   if (room.closedAt || room.firstMeetingConfirmedAt || room.recruitment !== 'complete') return null;
   const preview = exactMatches(countsOf(mems.filter((m) => sel.includes(m.userId)).map((m) => m.elementSnapshot)))[0];
@@ -652,14 +775,21 @@ function MeetingPanel({ room }: { room: Room }) {
           <div className="stack-s">
             {pm.attendees.map((a) => {
               const c = pm.confirmations[a.userId];
-              return <div key={a.userId} className="row small"><Atom el={a.element} size={20} /><span className="grow">{a.userId === viewer ? '나' : a.intro}</span><span className={`chip ${c === 'confirmed' ? 'ok' : ''}`}>{c === 'confirmed' ? '확인함' : '확인 대기'}</span></div>;
+              return <div key={a.userId} className="row small"><Atom el={a.element} size={20} /><span className="grow">{a.userId === viewer ? '나' : nickOf(s, viewer, a.userId) || a.intro}</span><span className={`chip ${c === 'confirmed' ? 'ok' : ''}`}>{c === 'confirmed' ? '확인함' : '확인 대기'}</span></div>;
             })}
           </div>
           {mems.filter((m) => !pm.attendees.some((a) => a.userId === m.userId)).length > 0 && <p className="small muted">불참으로 표시된 분은 확인하지 않아도 되고 카드도 받지 않아요.</p>}
+          {s.config.meetingProximity.required && <p className="small muted">참석자 모두 {s.config.meetingProximity.radiusM}m 안에서, 첫 확인 후 2시간 안에 눌러야 해요. 누를 때 위치를 한 번 확인하고, 만남이 확정되면 위치는 지워요.</p>}
           {pm.attendees.some((a) => a.userId === viewer) && !pm.confirmations[viewer] && (
             <div className="row">
               <button className="btn grow" onClick={() => run({ type: 'respondMeeting', actor: viewer, meetingId: pm.id, response: 'reject' }, '방장에게 수정을 요청했어요.')}>목록이 달라요</button>
-              <button className="btn primary grow" onClick={() => run({ type: 'respondMeeting', actor: viewer, meetingId: pm.id, response: 'confirm' }, '만남을 확인했어요.')}>실제로 만났어요</button>
+              <button className="btn primary grow" disabled={locating} onClick={async () => {
+                setLocating(true);
+                const g = await getLocation();
+                setLocating(false);
+                if (!g.ok) { await run({ type: 'respondMeeting', actor: viewer, meetingId: pm.id, response: 'confirm', loc: null }); return; }
+                await run({ type: 'respondMeeting', actor: viewer, meetingId: pm.id, response: 'confirm', loc: g.loc }, '만남을 확인했어요.');
+              }}>{locating ? '위치 확인 중…' : '실제로 만났어요'}</button>
             </div>
           )}
           {isHost && <button className="btn ghost sm" onClick={() => { setSel(pm.attendees.map((a) => a.userId)); setPicking(true); }}>참석자 수정 (기존 확인은 다시 받아요)</button>}
@@ -672,7 +802,7 @@ function MeetingPanel({ room }: { room: Room }) {
             {mems.map((mm) => (
               <label key={mm.userId} className="check" htmlFor={`att-${mm.userId}`}>
                 <input id={`att-${mm.userId}`} type="checkbox" checked={sel.includes(mm.userId)} onChange={() => toggle(mm.userId)} />
-                <Atom el={mm.elementSnapshot} size={22} /><span className="small grow">{mm.userId === viewer ? '나' : s.users[mm.userId].intro}</span>
+                <Atom el={mm.elementSnapshot} size={22} /><span className="small grow">{mm.userId === viewer ? '나' : nickOf(s, viewer, mm.userId) || s.users[mm.userId].intro}</span>
               </label>
             ))}
           </div>
@@ -731,7 +861,7 @@ function ChatSheet({ room, onClose }: { room: Room; onClose: () => void }) {
     <div className="sheet-bg" onClick={onClose}>
       <div className="sheet chat-sheet" role="dialog" aria-label={`${m.name} 실험실 채팅`} onClick={(e) => e.stopPropagation()}>
         <div className="row between">
-          <div className="stack-s" style={{ gap: 0 }}><h2><Formula f={m.formula} className="mono" /> 실험실 채팅</h2><span className="small muted">개인 채팅·친구 추가는 없어요</span></div>
+          <div className="stack-s" style={{ gap: 0 }}><h2>{roomTitle(room)}</h2><span className="small muted"><Formula f={m.formula} className="mono" /> 실험실 채팅</span><span className="small muted">개인 채팅·친구 추가는 없어요</span></div>
           <button className="btn sm" onClick={onClose}>닫기</button>
         </div>
         <div className="chat grow" ref={ref}>
@@ -741,7 +871,7 @@ function ChatSheet({ room, onClose }: { room: Room; onClose: () => void }) {
           ) : (
             <div key={x.id} className={`msg${x.senderId === viewer ? ' mine' : ''}`}>
               {x.senderId !== viewer && <Atom el={elOf(x.senderId)} size={26} />}
-              <div className="bubble"><span>{x.body}</span><br /><span className="small muted mono">{fmtTime(x.createdAt)}</span></div>
+              <div className="bubble">{x.senderId !== viewer && <><span className="small" style={{ fontWeight: 700 }}>{nickOf(s, viewer, x.senderId) || ELEMENTS[elOf(x.senderId)].name}</span><br /></>}<span>{x.body}</span><br /><span className="small muted mono">{fmtTime(x.createdAt)}</span></div>
             </div>
           ))}
         </div>
@@ -756,32 +886,51 @@ function ChatSheet({ room, onClose }: { room: Room; onClose: () => void }) {
   );
 }
 
-// ───────── 10~11. 컬렉션 ─────────
+// ───────── 10~11. 컬렉션 (도감) ─────────
 function Collection() {
-  const { s, viewer, go } = useApp();
-  const [tab, setTab] = useState<'cards' | 'nocard'>('cards');
-  const cards = s.cards.filter((c) => c.userId === viewer).sort((a, b) => b.firstEarnedAt - a.firstEarnedAt);
+  const { s, viewer, go, openReveal } = useApp();
+  const [tab, setTab] = useState<'dex' | 'nocard'>('dex');
+  const [filter, setFilter] = useState<'all' | 'owned' | 'locked' | 'mine'>('all');
+  const { owned, pending } = myCards(s, viewer);
+  const myEl = s.users[viewer].elementId!;
   const nocard = s.records.filter((r) => r.userId === viewer && !r.moleculeId);
+  const all = USABLE();
+  const pendingOf = (id: string) => pending.find((r) => r.moleculeId === id);
+  const list = all.filter((m) => filter === 'all' || (filter === 'owned' ? owned.has(m.id) : filter === 'locked' ? !owned.has(m.id) : (m.atomCounts[myEl] ?? 0) > 0));
+  const pct = Math.round((owned.size / all.length) * 100);
   return (
     <div className="stack">
-      <div className="row between"><h1>컬렉션</h1><button className="btn sm" onClick={() => go({ k: 'public' })}>공개 화면 미리보기</button></div>
+      <div className="row between"><h1>분자 도감</h1><button className="btn sm" onClick={() => go({ k: 'public' })}>공개 화면 미리보기</button></div>
+      <div className="panel" style={{ gap: 8 }}>
+        <div className="row between"><strong>{owned.size} / {all.length}종 모음</strong><span className="mono small muted">{pct}%</span></div>
+        <div className="meter"><div style={{ width: `${pct}%` }} /></div>
+        <p className="small muted">실제로 만난 사람들의 원소 구성이 그 분자와 같으면 카드가 열려요. {ELEMENTS[myEl].name} 자리가 있는 분자는 “내 자리 있음”으로 표시돼요.</p>
+      </div>
+      {pending.length > 0 && (
+        <button className="panel claim-banner" onClick={() => openReveal(pending[0].id)}>
+          <span className="claim-pack" aria-hidden="true" />
+          <span className="stack-s grow" style={{ gap: 2, textAlign: 'left' }}><strong>받을 카드 {pending.length}장</strong><span className="small muted">눌러서 열어 보세요</span></span>
+        </button>
+      )}
       <div className="seg">
-        <button className={tab === 'cards' ? 'on' : ''} onClick={() => setTab('cards')}>분자 카드 {cards.length}</button>
+        <button className={tab === 'dex' ? 'on' : ''} onClick={() => setTab('dex')}>도감</button>
         <button className={tab === 'nocard' ? 'on' : ''} onClick={() => setTab('nocard')}>카드 없는 만남 {nocard.length}</button>
       </div>
-      {tab === 'cards' && (cards.length === 0
-        ? <div className="panel flat"><p className="small muted">아직 카드가 없어요. 실험실에서 만나고 참석자 모두 확인하면 그 구성의 분자 카드를 받아요.</p></div>
-        : <div className="cards">{cards.map((c) => {
-            const m = moleculeById(c.moleculeId)!; const n = s.records.filter((r) => r.userId === viewer && r.moleculeId === c.moleculeId).length;
-            return (
-              <button key={c.moleculeId} className="panel mcard" onClick={() => go({ k: 'card', mol: c.moleculeId })}>
-                <Formula f={m.formula} style={{ fontSize: 26 }} />
-                <span className="small">{m.name}</span>
-                <MoleculeStrip formula={m.formula} target={m.atomCounts} members={[]} size={14} labels={false} />
-                <span className="row small muted"><span className="mono">만남 {n}회</span><span className={`chip ${c.visibility === 'public' ? 'on' : ''}`}>{c.visibility === 'public' ? '공개' : '비공개'}</span></span>
-              </button>
-            );
-          })}</div>)}
+      {tab === 'dex' && (
+        <>
+          <div className="row" style={{ gap: 6 }}>
+            {([['all', '전체'], ['owned', '모은 것'], ['locked', '아직'], ['mine', '내 자리 있음']] as const).map(([k, l]) => (
+              <button key={k} className={`chip pick${filter === k ? ' on' : ''}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>{l}</button>
+            ))}
+          </div>
+          <div className="dex-grid">
+            {list.map((m) => (
+              <DexTile key={m.id} id={m.id} owned={owned.has(m.id)} pending={!!pendingOf(m.id)} mineFits={(m.atomCounts[myEl] ?? 0) > 0}
+                onOpen={() => owned.has(m.id) ? go({ k: 'card', mol: m.id }) : pendingOf(m.id) && openReveal(pendingOf(m.id)!.id)} />
+            ))}
+          </div>
+        </>
+      )}
       {tab === 'nocard' && (nocard.length === 0
         ? <div className="panel flat"><p className="small muted">참석 구성이 유효한 분자가 아니었던 만남이 여기 남아요.</p></div>
         : nocard.map((r) => <RecordRow key={r.id} recId={r.id} />))}
@@ -811,31 +960,29 @@ function RecordRow({ recId }: { recId: string }) {
 
 function CardDetail({ mol }: { mol: string }) {
   const { s, viewer, run, go } = useApp();
-  const c = s.cards.find((x) => x.userId === viewer && x.moleculeId === mol);
-  const m = moleculeById(mol)!;
-  if (!c) return <p>카드를 찾을 수 없어요.</p>;
-  const recs = s.records.filter((r) => r.userId === viewer && r.moleculeId === mol).sort((a, b) => b.createdAt - a.createdAt);
+  const { owned, recordsOf } = myCards(s, viewer);
+  const ids = USABLE().map((m) => m.id).filter((id) => owned.has(id));
+  const [cur, setCur] = useState(mol);
+  if (!ids.length || !owned.has(mol)) return <div className="stack"><button className="back" onClick={() => go({ k: 'collection' })}>← 도감</button><p>카드를 찾을 수 없어요.</p></div>;
+  const c = s.cards.find((x) => x.userId === viewer && x.moleculeId === cur);
+  const m = moleculeById(cur)!;
   return (
     <div className="stack">
-      <button className="back" onClick={() => go({ k: 'collection' })}>← 컬렉션</button>
-      <div className="panel" style={{ alignItems: 'flex-start' }}>
-        <Formula f={m.formula} className="formula xl" />
-        <h2>{m.name}</h2>
-        <span className="chip">{kindLabel(m)}</span>
-        <div style={{ width: '100%' }}><Molecule3D id={m.id} height={240} label={m.name} /></div>
-        <p className="small">{m.stabilityNote}</p>
-        <p className="small muted mono">{m.sources.join(' · ')} · 처음 얻은 날 {fmtDate(c.firstEarnedAt)}</p>
-        <div className="row between" style={{ width: '100%' }}>
-          <span className="small">카드 공개</span>
-          <div className="seg">
-            <button className={c.visibility === 'private' ? 'on' : ''} onClick={() => run({ type: 'setCardVisibility', actor: viewer, moleculeId: mol, visibility: 'private' })}>비공개</button>
-            <button className={c.visibility === 'public' ? 'on' : ''} onClick={() => run({ type: 'setCardVisibility', actor: viewer, moleculeId: mol, visibility: 'public' })}>공개</button>
+      <button className="back" onClick={() => go({ k: 'collection' })}>← 도감</button>
+      <CardCarousel ids={ids} start={mol} recordsOf={recordsOf} onIndex={setCur} />
+      <div className="panel" style={{ gap: 8 }}>
+        <div className="row between"><strong>{m.name}</strong><span className="chip">{kindLabel(m)}</span></div>
+        <p className="small muted mono">{m.sources.join(' · ')}{c ? ` · 처음 얻은 날 ${fmtDate(c.firstEarnedAt)}` : ''}</p>
+        {c && (
+          <div className="row between">
+            <span className="small">이 카드 공개</span>
+            <div className="seg">
+              <button className={c.visibility === 'private' ? 'on' : ''} onClick={() => run({ type: 'setCardVisibility', actor: viewer, moleculeId: cur, visibility: 'private' })}>비공개</button>
+              <button className={c.visibility === 'public' ? 'on' : ''} onClick={() => run({ type: 'setCardVisibility', actor: viewer, moleculeId: cur, visibility: 'public' })}>공개</button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
-      <div className="section-title"><h2>함께한 만남</h2><span className="mono small muted">{recs.length}회</span></div>
-      {recs.map((r) => <RecordRow key={r.id} recId={r.id} />)}
-      <p className="small muted">기록에는 만난 시점의 원소와 한 줄 소개가 그대로 남아요.</p>
     </div>
   );
 }
@@ -843,16 +990,17 @@ function CardDetail({ mol }: { mol: string }) {
 function PublicPreview() {
   const { s, viewer, go } = useApp();
   const me = s.users[viewer];
-  const cards = s.cards.filter((c) => c.userId === viewer && c.visibility === 'public');
+  const { owned } = myCards(s, viewer);
+  const cards = s.cards.filter((c) => c.userId === viewer && c.visibility === 'public' && owned.has(c.moleculeId));
   const recs = s.records.filter((r) => r.userId === viewer && r.visibility === 'public');
   return (
     <div className="stack">
-      <button className="back" onClick={() => go({ k: 'collection' })}>← 컬렉션</button>
+      <button className="back" onClick={() => go({ k: 'collection' })}>← 도감</button>
       <h1>다른 학생에게 보이는 화면</h1>
       <p className="small muted">공개로 설정한 카드와 기록만 보여요. 함께한 사람의 한 줄 소개는 그 사람의 동의 정책이 정해지기 전까지 보이지 않고, 원소만 보여요.</p>
-      <div className="panel" style={{ flexDirection: 'row', alignItems: 'center' }}><Atom el={me.elementId!} size={44} /><div className="grow"><strong>{ELEMENTS[me.elementId!].name}</strong><p className="small">{me.intro}</p></div></div>
+      <div className="panel" style={{ flexDirection: 'row', alignItems: 'center' }}><Atom el={me.elementId!} size={44} /><div className="grow"><strong>{me.nickname || ELEMENTS[me.elementId!].name}</strong><p className="small">{me.intro}</p></div></div>
       {cards.length === 0 && recs.length === 0 && <div className="panel flat"><p className="small muted">공개한 카드나 기록이 없어요.</p></div>}
-      {cards.length > 0 && <div className="cards">{cards.map((c) => { const m = moleculeById(c.moleculeId)!; return <div key={c.moleculeId} className="panel mcard"><Formula f={m.formula} style={{ fontSize: 24 }} /><span className="small">{m.name}</span></div>; })}</div>}
+      {cards.length > 0 && <div className="dex-grid">{cards.map((c) => <DexTile key={c.moleculeId} id={c.moleculeId} owned pending={false} mineFits={false} />)}</div>}
       {recs.map((r) => (
         <div key={r.id} className="panel" style={{ gap: 6 }}>
           <span className="small mono">{fmtDate(r.createdAt)} · {r.moleculeId ? moleculeById(r.moleculeId)!.formula : '카드 없는 만남'}</span>
@@ -865,10 +1013,14 @@ function PublicPreview() {
 
 // ───────── 12. 내 정보 ─────────
 function Profile() {
-  const { s, viewer, run, go, backend } = useApp();
+  const { s, viewer, run, go, backend, openProfile } = useApp();
   const [out, setOut] = useState(false);
   const me = s.users[viewer];
   const [intro, setIntro] = useState(me.intro);
+  const [nick, setNick] = useState(me.nickname ?? '');
+  const [tags, setTags] = useState<string[]>(me.tags ?? []);
+  const mine = getProfile(s, viewer, viewer);
+  const blocked = s.blocks.filter((b) => b.from === viewer);
   const rooms = [...new Set(s.members.filter((m) => m.userId === viewer).map((m) => m.roomId))].map((id) => s.rooms[id]).sort((a, b) => b.createdAt - a.createdAt);
   return (
     <div className="stack" style={{ gap: 18 }}>
@@ -881,6 +1033,12 @@ function Profile() {
           <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => go({ k: 'table', el: me.elementId! })}>주기율표에서 보기</button>
         </div>
       </div>
+      {mine && <div className="panel"><ReactionMeter score={mine.reaction.score} reviews={mine.reaction.reviews} /><button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => openProfile(viewer)}>다른 사람에게 보이는 내 프로필</button></div>}
+      <form className="panel" onSubmit={(e) => { e.preventDefault(); run({ type: 'updateProfile', actor: viewer, nickname: nick, tags }, '프로필을 저장했어요.'); }}>
+        <NicknameInput id="nick-edit" value={nick} onChange={setNick} />
+        <TagPicker value={tags} onChange={setTags} />
+        <button className="btn primary sm" style={{ alignSelf: 'flex-end' }} disabled={nick.trim().length < 2 || (nick.trim() === (me.nickname ?? '') && tags.join() === (me.tags ?? []).join())}>저장</button>
+      </form>
       <form className="panel" onSubmit={(e) => { e.preventDefault(); run({ type: 'updateIntro', actor: viewer, intro }, '한 줄 소개를 바꿨어요.'); }}>
         <label htmlFor="intro-edit"><h3>한 줄 소개</h3></label>
         <input id="intro-edit" className="input" maxLength={INTRO_MAX} value={intro} onChange={(e) => setIntro(e.target.value)} />
@@ -894,17 +1052,103 @@ function Profile() {
           const st = roomStatus(r); const left = !isMember(s, r.id, viewer);
           return (
             <button key={r.id} className="panel roomcard" style={{ flexDirection: 'row', alignItems: 'center', padding: 12 }} onClick={() => go({ k: 'room', id: r.id })}>
-              <Formula f={moleculeById(r.targetMoleculeId)!.formula} className="formula grow" style={{ fontSize: 18 }} />
+              <span className="stack-s grow" style={{ gap: 0, minWidth: 0, textAlign: 'left' }}><strong>{roomTitle(r)}</strong><Formula f={moleculeById(r.targetMoleculeId)!.formula} className="small mono muted" /></span>
               {left && !r.closedAt && <span className="chip">나옴</span>}
               <span className={`chip ${st.cls}`}>{st.label}</span>
             </button>
           );
         })}
       </section>
+      {blocked.length > 0 && (
+        <section className="stack-s">
+          <h2>차단한 사람</h2>
+          {blocked.map((b) => <div key={b.to} className="row between panel" style={{ padding: 12 }}><span>{s.users[b.to]?.nickname || '알 수 없음'}</span><button className="btn sm" onClick={() => run({ type: 'unblock', actor: viewer, target: b.to }, '차단을 풀었어요.')}>차단 풀기</button></div>)}
+        </section>
+      )}
+      {isAdminView(s, viewer) && <button className="btn block" onClick={() => go({ k: 'admin' })}>관리자 화면 · 처리 전 신고 {s.reports.filter((r) => r.status === 'open').length}</button>}
       <p className="small muted">{METAPHOR_NOTICE}</p>
       {backend.signOut && <button className="btn block" disabled={out} onClick={async () => { setOut(true); await backend.signOut!(); location.reload(); }}>로그아웃</button>}
     </div>
   );
+}
+
+/** 방장: 실험실 이름·모이는 시각 고치기. 이름 없는 자동 매칭 실험실이면 먼저 열어 둔다 */
+function RoomInfoEditor({ room }: { room: Room }) {
+  const { viewer, run } = useApp();
+  const [open, setOpen] = useState(!room.name);
+  const [name, setName] = useState(room.name ?? '');
+  const toLocal = (t: number) => { const d = new Date(t - new Date().getTimezoneOffset() * 60_000); return d.toISOString().slice(0, 16); };
+  const [when, setWhen] = useState(room.meetAt ? toLocal(room.meetAt) : '');
+  if (!open) return <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setOpen(true)}>실험실 이름·시각 바꾸기</button>;
+  return (
+    <form className={`panel${room.name ? '' : ' warn'}`} onSubmit={async (e) => {
+      e.preventDefault();
+      const r = await run({ type: 'renameRoom', actor: viewer, roomId: room.id, name, meetAt: when ? new Date(when).getTime() : null }, '실험실 정보를 바꿨어요.');
+      if (r.ok) setOpen(false);
+    }}>
+      {!room.name && <p className="small"><strong>실험실 이름을 정해 주세요.</strong> 자동 매칭으로 만들어진 실험실이라 아직 이름이 없어요. 방장이 정할 수 있어요.</p>}
+      <label className="stack-s" htmlFor={`rn-${room.id}`}><span className="small" style={{ fontWeight: 600 }}>실험실 이름</span>
+        <input id={`rn-${room.id}`} className="input" maxLength={ROOM_NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 2시에 밥 먹을 사람" /></label>
+      <label className="stack-s" htmlFor={`rw-${room.id}`}><span className="small" style={{ fontWeight: 600 }}>모이는 시각 (선택)</span>
+        <input id={`rw-${room.id}`} className="input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} /></label>
+      <div className="row">{room.name && <button type="button" className="btn ghost" onClick={() => setOpen(false)}>취소</button>}<button className="btn primary grow" disabled={name.trim().length < 2}>저장</button></div>
+    </form>
+  );
+}
+
+/** 만남이 확인된 뒤: 분자 카드 받기 + 반응 남기기 */
+function ClaimPanel({ room }: { room: Room }) {
+  const { s, viewer, run, openReveal, openReview } = useApp();
+  const recs = s.records.filter((r) => r.userId === viewer && r.roomId === room.id);
+  if (!recs.length) return null;
+  const rec = recs[recs.length - 1] as MeetingRecord;
+  const mt = s.meetings.find((m) => m.id === rec.meetingId);
+  const left = mt ? mt.attendees.filter((a) => a.userId !== viewer && !s.reviews.some((x) => x.meetingId === mt.id && x.from === viewer && x.to === a.userId)).length : 0;
+  return (
+    <div className="panel claim-panel">
+      {!rec.claimedAt ? (rec.moleculeId ? (
+        <>
+          <h3>첫 만남이 확인됐어요!</h3>
+          <p className="small">함께 만난 구성으로 {molName(rec.moleculeId)} 카드가 생겼어요.</p>
+          <button className="btn primary block claim-btn" onClick={() => openReveal(rec.id)}>분자 카드 받기</button>
+        </>
+      ) : (
+        <>
+          <h3>첫 만남이 확인됐어요</h3>
+          <p className="small">참석 구성이 유효한 분자가 아니어서 카드 대신 만남 기록이 남았어요.</p>
+          <button className="btn block" onClick={() => run({ type: 'claimCard', actor: viewer, recordId: rec.id }, '만남 기록을 받았어요.')}>만남 기록 받기</button>
+        </>
+      )) : <p className="small">{rec.moleculeId ? `${molName(rec.moleculeId)} 카드를 받았어요.` : '만남 기록을 받았어요.'}</p>}
+      {mt && left > 0 && <button className="btn block" onClick={() => openReview(mt.id)}>함께한 사람에게 반응 남기기 · {left}명 남음</button>}
+    </div>
+  );
+}
+
+/** 방장: 캠퍼스 지도에 내 위치 보여 주기 */
+function LocationShare() {
+  const { s, viewer, run } = useApp();
+  const on = !!s.users[viewer].sharingLocation;
+  const loc = s.locations[viewer];
+  return (
+    <div className="panel" style={{ gap: 8 }}>
+      <div className="row between">
+        <span className="stack-s grow" style={{ gap: 0 }}><strong>내 위치를 캠퍼스 지도에 보여 주기</strong><span className="small muted">캠퍼스 안에 있는 모든 사용자가 볼 수 있어요</span></span>
+        <button role="switch" aria-checked={on} className={`switch${on ? ' on' : ''}`} onClick={() => run({ type: 'setSharing', actor: viewer, on: !on }, on ? '위치 공유를 껐어요.' : '위치 공유를 켰어요.')}><span /></button>
+      </div>
+      {on && <p className="small muted">{loc ? `마지막 위치 ${fmtTime(loc.at)} · ` : '위치를 찾는 중 · '}캠퍼스를 벗어나거나 첫 만남이 확인되면 자동으로 꺼져요. 위치 기록은 남기지 않고 마지막 위치 하나만 보여요.</p>}
+    </div>
+  );
+}
+
+function NearbyScreen() {
+  const { s, viewer, go, now, backend } = useApp();
+  return <Nearby s={s} viewer={viewer} now={now} onOpenRoom={(id) => go({ k: 'room', id })} refresh={() => (backend as Backend & { refresh?: () => Promise<void> }).refresh?.().catch(() => undefined)} />;
+}
+
+function AdminScreen() {
+  const { s, viewer, run, go } = useApp();
+  if (!isAdminView(s, viewer)) return <p>관리자만 볼 수 있어요.</p>;
+  return <div className="stack"><button className="back" onClick={() => go({ k: 'profile' })}>← 내 정보</button><AdminView s={s} viewer={viewer} run={run} /></div>;
 }
 
 function ElementPage({ el }: { el: ElementId }) {
@@ -937,7 +1181,16 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
     if (choice === 'no') { if (pending[0]) run({ type: 'vote', actor: pending[0], proposalId: p.id, choice: 'no' }); return; }
     for (const u of pending) await run({ type: 'vote', actor: u, proposalId: p.id, choice: 'yes' });
   };
-  const othersConfirm = async () => { if (pm) for (const a of pm.attendees) if (a.userId !== viewer && !pm.confirmations[a.userId]) await run({ type: 'respondMeeting', actor: a.userId, meetingId: pm.id, response: 'confirm' }); };
+  const near = () => ({ lat: CAMPUS.center.lat + (Math.random() - 0.5) * 0.0004, lng: CAMPUS.center.lng + (Math.random() - 0.5) * 0.0004, acc: 20 });
+  const othersConfirm = async () => { if (pm) for (const a of pm.attendees) if (a.userId !== viewer && !pm.confirmations[a.userId]) await run({ type: 'respondMeeting', actor: a.userId, meetingId: pm.id, response: 'confirm', loc: near() }); };
+  const doneMeeting = r ? s.meetings.filter((m) => m.roomId === r.id && m.status === 'confirmed').at(-1) : undefined;
+  const othersReview = async () => {
+    if (!doneMeeting) return;
+    const pool = ['kind', 'fun', 'again', 'punctual', 'caring', 'reply'];
+    for (const a of doneMeeting.attendees) if (a.userId !== viewer && !s.reviews.some((x) => x.meetingId === doneMeeting.id && x.from === a.userId && x.to === viewer))
+      await run({ type: 'review', actor: a.userId, meetingId: doneMeeting.id, to: viewer, tags: [pool[Math.floor(Math.random() * pool.length)]] });
+  };
+  const [sim, setSim] = useState(getSimulated());
   const hostActs = () => r && r.hostId !== viewer && setViewer(r.hostId);
   return (
     <div className="sheet-bg" onClick={onClose}>
@@ -948,7 +1201,7 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
         <div className="panel">
           <label htmlFor="viewer-sel"><h3>누구의 화면으로 볼까요</h3></label>
           <select id="viewer-sel" className="input" value={viewer} onChange={(e) => setViewer(e.target.value)}>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.virtual ? u.demoLabel : `나${u.elementId ? ` · ${u.elementId}` : ''}`} — {u.intro || '소개 없음'}</option>)}
+            {users.map((u) => <option key={u.id} value={u.id}>{u.virtual ? `${u.demoLabel} ${u.nickname ?? ''}` : `나${u.elementId ? ` · ${u.elementId}` : ''}`} — {u.intro || '소개 없음'}</option>)}
           </select>
           {s.meId && viewer !== s.meId && <button className="btn sm" onClick={() => setViewer(s.meId!)}>내 화면으로 돌아가기</button>}
         </div>
@@ -963,7 +1216,19 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
               <button className="btn block" disabled={!p} onClick={() => othersVote('no')}>투표: 다른 구성원 한 명 반대</button>
               <button className="btn block" disabled={!p} onClick={() => p && run({ type: 'expireProposal', proposalId: p.id }, '응답 기한이 끝났어요.')}>투표 응답 기한 끝내기</button>
               <button className="btn block" disabled={!pm} onClick={othersConfirm}>만남: 다른 참석자 모두 확인</button>
+              <button className="btn block" disabled={!doneMeeting} onClick={othersReview}>만남 후: 다른 참석자들이 나에게 반응 남기기</button>
               <button className="btn block" disabled={r.hostId === viewer} onClick={hostActs}>방장 화면으로 보기</button>
+            </div>
+          </div>
+        )}
+
+        {isDemoGeo() && (
+          <div className="panel">
+            <h3>내 위치 흉내 내기</h3>
+            <p className="small muted">시연판은 진짜 GPS 대신 이 위치를 써요. 만남 확인과 주변 원자 찾기에 쓰여요.</p>
+            <div className="seg">
+              <button className={sim === 'campus' ? 'on' : ''} onClick={() => { setSimulated('campus'); setSim('campus'); }}>캠퍼스 안</button>
+              <button className={sim === 'away' ? 'on' : ''} onClick={() => { setSimulated('away'); setSim('away'); }}>캠퍼스 밖</button>
             </div>
           </div>
         )}

@@ -20,12 +20,17 @@ function fakeServer() {
     now: () => (t += 1000),
   };
   const call = (tok: string | null, body: unknown) => handle(tok, body, deps);
-  const d = async (tok: string, cmd: object) => (await call(tok, { action: 'dispatch', cmd })).body as any;
+  const d = async (tok: string, cmd: object) => {
+    const c = cmd as any;
+    const full = c.type === 'createRoom' && !c.name ? { ...c, name: '서버 실험실' } : c.type === 'respondMeeting' && c.response === 'confirm' && !c.loc ? { ...c, loc: { lat: 37.611, lng: 126.9968, acc: 20 } } : c;
+    return (await call(tok, { action: 'dispatch', cmd: full })).body as any;
+  };
   return { call, d, get row() { return row; }, get bumps() { return bumps; }, failOnce: () => { failNextSave = true; }, advance: (ms: number) => { t += ms; } };
 }
 
 async function onboard(f: ReturnType<typeof fakeServer>, tok: string, el: string) {
   await f.d(tok, { type: 'createUser', intro: `${el} 친구` });
+  await f.d(tok, { type: 'updateProfile', nickname: `닉${tok.slice(-1)}` });
   await f.d(tok, { type: 'lockElement', elementId: el, acknowledged: true });
 }
 
@@ -121,8 +126,9 @@ describe('화면 쪽 서버 연결', () => {
     expect(a.getState().meId).toBeNull();
     expect((await a.dispatch({ type: 'createUser', intro: '산소예요' } as any)).ok).toBe(true);
     expect(a.getState().meId).toBe('A');
+    await a.dispatch({ type: 'updateProfile', actor: 'A', nickname: '산소짱' });
     await a.dispatch({ type: 'lockElement', actor: 'whoever', elementId: 'O', acknowledged: true });
-    const room = await a.dispatch({ type: 'createRoom', actor: 'A', moleculeId: 'h2o', chatPolicy: 'immediate' });
+    const room = await a.dispatch({ type: 'createRoom', actor: 'A', moleculeId: 'h2o', chatPolicy: 'immediate', name: '점심 실험실' });
     await new Promise((r) => setTimeout(r, 10));
     expect(Object.keys(b.getState().rooms)).toContain(room.createdId);
     expect(b.getState().users.A.intro).toBe('산소예요');

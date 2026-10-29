@@ -16,7 +16,7 @@ function mix(a: string, b: string, t: number): string {
   return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`;
 }
 
-export default function Molecule3D({ id, height = 200, label }: { id: string; height?: number; label: string }) {
+export default function Molecule3D({ id, height = 200, label, bare }: { id: string; height?: number; label: string; bare?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const g = GEOMETRY[id];
   const ionic = !!g?.note; // 이온 결정 모형에는 설명(note)이 붙어 있다
@@ -132,9 +132,9 @@ export default function Molecule3D({ id, height = 200, label }: { id: string; he
 
   if (!g) return null;
   return (
-    <figure className="mol3d">
+    <figure className={`mol3d${bare ? ' bare' : ''}`}>
       <canvas ref={ref} style={{ height }} role="img" aria-label={`${label} 3D 모형. 끌어서 돌려 볼 수 있어요.`} />
-      <figcaption className="small muted">{g.note ?? '끌어서 돌려 보세요.'}{g.note ? ' 끌어서 돌려 보세요.' : ''}</figcaption>
+      {!bare && <figcaption className="small muted">{g.note ?? '끌어서 돌려 보세요.'}{g.note ? ' 끌어서 돌려 보세요.' : ''}</figcaption>}
     </figure>
   );
 }

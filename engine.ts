@@ -5,14 +5,28 @@ import { moleculeById, USABLE, type ElementId } from './molecules';
 import { QUESTIONS, QUIZ_VERSION, scoreQuiz } from './quiz';
 import { contains, countsOf, exactMatches, hasVacancy, sameCounts, supersetCandidates, usableElements } from './chemistry';
 import { complementScore, matchReason, RECOMMEND_CONFIG } from './recommend';
-import { DomainError, type ChatPolicy, type Id, type Proposal, type Room, type State, type Visibility } from './types';
+import { DomainError, type ChatPolicy, type GeoPoint, type Id, type Proposal, type ReportReason, type Room, type State, type Visibility } from './types';
+import { distanceM, isOnCampus } from './campus';
+import { INTEREST_TAGS, PRAISE, PRAISE_MAX, REACTION, REPORT_REASONS, TAGS_MAX } from './social';
 
 export type Command =
-  | { type: 'createUser'; id?: Id; intro: string; virtual?: boolean; demoLabel?: string; elementId?: ElementId; makeMe?: boolean }
+  | { type: 'createUser'; id?: Id; intro: string; virtual?: boolean; demoLabel?: string; elementId?: ElementId; makeMe?: boolean; nickname?: string }
   | { type: 'recordQuiz'; actor: Id; answers: Record<string, number> }
   | { type: 'lockElement'; actor: Id; elementId: ElementId; acknowledged: boolean }
   | { type: 'updateIntro'; actor: Id; intro: string }
-  | { type: 'createRoom'; actor: Id; moleculeId: string; chatPolicy: ChatPolicy; recruitDays?: number }
+  | { type: 'createRoom'; actor: Id; moleculeId: string; chatPolicy: ChatPolicy; recruitDays?: number; name?: string; meetAt?: number | null }
+  | { type: 'renameRoom'; actor: Id; roomId: Id; name: string; meetAt: number | null }
+  | { type: 'claimCard'; actor: Id; recordId: Id }
+  | { type: 'updateProfile'; actor: Id; nickname?: string; tags?: string[] }
+  | { type: 'review'; actor: Id; meetingId: Id; to: Id; tags: string[] }
+  | { type: 'report'; actor: Id; target: Id; roomId?: Id | null; reason: ReportReason; detail: string }
+  | { type: 'block'; actor: Id; target: Id }
+  | { type: 'unblock'; actor: Id; target: Id }
+  | { type: 'setSharing'; actor: Id; on: boolean }
+  | { type: 'setLocation'; actor: Id; loc: GeoPoint | null }
+  | { type: 'adminResolveReport'; actor: Id; reportId: Id; decision: 'upheld' | 'dismissed' }
+  | { type: 'adminSetSuspended'; actor: Id; target: Id; suspended: boolean }
+  | { type: 'makeAdmin'; userId: Id }
   | { type: 'joinRoom'; actor: Id; roomId: Id }
   | { type: 'leaveRoom'; actor: Id; roomId: Id }
   | { type: 'startAutoMatch'; actor: Id }
@@ -24,21 +38,40 @@ export type Command =
   | { type: 'expireProposal'; proposalId: Id }
   | { type: 'closeRoom'; actor: Id; roomId: Id }
   | { type: 'proposeMeeting'; actor: Id; roomId: Id; attendeeIds: Id[] }
-  | { type: 'respondMeeting'; actor: Id; meetingId: Id; response: 'confirm' | 'reject' }
+  | { type: 'respondMeeting'; actor: Id; meetingId: Id; response: 'confirm' | 'reject'; loc?: GeoPoint | null }
   | { type: 'setCardVisibility'; actor: Id; moleculeId: string; visibility: Visibility }
   | { type: 'setRecordVisibility'; actor: Id; recordId: Id; visibility: Visibility }
   | { type: 'resolveConflict'; actor: Id; keepRoomId: Id }
   | { type: 'readNotifications'; actor: Id };
 
 export const INTRO_MAX = 40;
+export const NICK_MIN = 2, NICK_MAX = 10, ROOM_NAME_MIN = 2, ROOM_NAME_MAX = 30;
+/** 방장 위치가 이보다 오래되면 지도에서 숨긴다 */
+export const LOCATION_FRESH_MS = 15 * 60_000;
 const DAY = 86_400_000, HOUR = 3_600_000;
+
+export const DEFAULT_CONFIG: State['config'] = {
+  defaultRecruitDays: 3, proposalHours: 24,
+  meetingProximity: { required: true, radiusM: 100, windowMs: 2 * HOUR, maxAccuracyM: 150 },
+  suspendAfterReports: 3,
+};
 
 export function emptyState(): State {
   return {
     version: 1, seq: 1, meId: null, users: {}, rooms: {}, members: [], queue: [], proposals: [], messages: [],
     meetings: [], cards: [], records: [], notifications: [], quizAttempts: [],
-    config: { defaultRecruitDays: 3, proposalHours: 24 },
+    reviews: [], reports: [], blocks: [], locations: {}, admins: [],
+    config: structuredClone(DEFAULT_CONFIG),
   };
+}
+
+/** 예전 버전으로 저장된 상태에 새 항목을 채운다 */
+export function normalize(s: State): State {
+  const d = emptyState();
+  const out = { ...d, ...s, config: { ...d.config, ...(s.config ?? {}) } } as State;
+  for (const k of ['reviews', 'reports', 'blocks', 'admins'] as const) if (!Array.isArray(out[k])) (out as any)[k] = [];
+  if (!out.locations) out.locations = {};
+  return out;
 }
 
 // ───────── 조회 헬퍼 ─────────
@@ -69,11 +102,66 @@ export function canChat(s: State, roomId: Id, uid: Id): boolean {
   return r.recruitment === 'complete' || r.firstMeetingConfirmedAt !== null;
 }
 
+export const isBlockedPair = (s: State, a: Id, b: Id) => s.blocks.some((x) => (x.from === a && x.to === b) || (x.from === b && x.to === a));
+export const blockedWithRoom = (s: State, uid: Id, roomId: Id) => activeMembers(s, roomId).some((m) => isBlockedPair(s, uid, m.userId));
+
 export function joinableRoomsFor(s: State, uid: Id): Room[] {
   const u = s.users[uid];
   if (!u?.elementId) return [];
-  return Object.values(s.rooms).filter((r) => isRecruitingOpen(r) && !isMember(s, r.id, uid)
+  return Object.values(s.rooms).filter((r) => isRecruitingOpen(r) && !isMember(s, r.id, uid) && !blockedWithRoom(s, uid, r.id)
     && hasVacancy(moleculeById(r.targetMoleculeId)!.atomCounts, roomCounts(s, r.id), u.elementId!));
+}
+
+export const roomTitle = (r: Room) => r.name || `${moleculeById(r.targetMoleculeId)!.name} 실험실`;
+
+/** 같은 실험실(종료 전)에 viewer가 지금 있고 target이 한 번이라도 있었으면 프로필을 볼 수 있다 */
+export function canViewProfile(s: State, viewer: Id, target: Id): boolean {
+  if (viewer === target) return true;
+  return s.members.some((m) => m.userId === viewer && m.leftAt === null && s.rooms[m.roomId]?.closedAt === null
+    && s.members.some((o) => o.roomId === m.roomId && o.userId === target));
+}
+
+export interface Reaction { score: number | null; reviews: number; praise: Record<string, number> }
+export function reactionOf(s: State, uid: Id): Reaction {
+  const got = s.reviews.filter((r) => r.to === uid);
+  const praise: Record<string, number> = {};
+  for (const r of got) for (const t of r.tags) praise[t] = (praise[t] ?? 0) + 1;
+  const total = Object.values(praise).reduce((a, b) => a + b, 0);
+  const upheld = s.reports.filter((r) => r.target === uid && r.status === 'upheld').length;
+  const raw = REACTION.base + total * REACTION.perPraise + upheld * REACTION.perUpheldReport;
+  return { score: got.length >= REACTION.minReviewsToShow ? Math.max(0, Math.min(100, raw)) : null, reviews: got.length, praise };
+}
+
+export interface PublicProfile {
+  id: Id; nickname: string; element: ElementId | null; intro: string; tags: string[];
+  reaction: Reaction; molecules: string[];
+}
+export function buildProfile(s: State, uid: Id): PublicProfile {
+  const u = s.users[uid];
+  const claimed = new Set(s.records.filter((r) => r.userId === uid && r.moleculeId && r.claimedAt).map((r) => r.moleculeId!));
+  return { id: uid, nickname: u?.nickname ?? '', element: u?.elementId ?? null, intro: u?.intro ?? '', tags: u?.tags ?? [],
+    reaction: reactionOf(s, uid), molecules: [...claimed] };
+}
+/** 화면에서 쓰는 프로필 조회. 서버가 보낸 보기에는 볼 수 있는 프로필만 profiles에 들어 있다 */
+export function getProfile(s: State & { profiles?: Record<Id, PublicProfile> }, viewer: Id, uid: Id): PublicProfile | null {
+  if (s.profiles) return s.profiles[uid] ?? null;
+  return canViewProfile(s, viewer, uid) ? buildProfile(s, uid) : null;
+}
+
+/** 위치를 지도에 보여 줄 방장: 공유 중, 15분 안에 갱신, 캠퍼스 안, 첫 만남 전 열린 실험실의 방장 */
+export function hostPins(s: State, now: number): { userId: Id; lat: number; lng: number; rooms: Room[] }[] {
+  const out: { userId: Id; lat: number; lng: number; rooms: Room[] }[] = [];
+  for (const [uid, loc] of Object.entries(s.locations)) {
+    if (!s.users[uid]?.sharingLocation || now - loc.at > LOCATION_FRESH_MS || !isOnCampus(loc.lat, loc.lng)) continue;
+    const rooms = Object.values(s.rooms).filter((r) => r.hostId === uid && r.closedAt === null && r.firstMeetingConfirmedAt === null);
+    if (rooms.length) out.push({ userId: uid, lat: loc.lat, lng: loc.lng, rooms });
+  }
+  return out;
+}
+const hostsOpenRoom = (s: State, uid: Id) => Object.values(s.rooms).some((r) => r.hostId === uid && r.closedAt === null && r.firstMeetingConfirmedAt === null);
+function stopSharing(s: State, uid: Id) {
+  if (s.users[uid]) s.users[uid].sharingLocation = false;
+  delete s.locations[uid];
 }
 
 // ───────── 내부 변경 헬퍼 (draft를 직접 수정) ─────────
@@ -82,8 +170,30 @@ function fail(msg: string): never { throw new DomainError(msg); }
 function lockedUser(s: State, uid: Id) {
   const u = s.users[uid] ?? fail('사용자를 찾을 수 없어요.');
   if (!u.elementId || !u.elementLockedAt) fail('원소를 먼저 확정해 주세요.');
+  if (!u.nickname) fail('닉네임을 먼저 정해 주세요.');
+  if (u.suspendedAt) fail('신고가 쌓여 이용이 잠시 정지됐어요. 관리자 확인을 기다려 주세요.');
   return u as typeof u & { elementId: ElementId };
 }
+function cleanNickname(s: State, uid: Id, raw: string): string {
+  const n = raw.trim().replace(/\s+/g, ' ');
+  if (n.length < NICK_MIN || n.length > NICK_MAX) fail(`닉네임은 ${NICK_MIN}~${NICK_MAX}자로 정해 주세요.`);
+  if (!/^[가-힣a-zA-Z0-9_ .]+$/.test(n)) fail('닉네임에는 한글, 영문, 숫자, _ 만 쓸 수 있어요.');
+  if (Object.values(s.users).some((u) => u.id !== uid && (u.nickname ?? '').toLowerCase() === n.toLowerCase())) fail('이미 쓰고 있는 닉네임이에요.');
+  return n;
+}
+function cleanRoomName(raw: string): string {
+  const n = raw.trim().replace(/\s+/g, ' ');
+  if (n.length < ROOM_NAME_MIN || n.length > ROOM_NAME_MAX) fail(`실험실 이름은 ${ROOM_NAME_MIN}~${ROOM_NAME_MAX}자로 정해 주세요.`);
+  return n;
+}
+function cleanMeetAt(v: number | null | undefined, now: number): number | null {
+  if (v === null || v === undefined) return null;
+  if (!Number.isFinite(v)) fail('모이는 시각을 다시 골라 주세요.');
+  if (v < now - HOUR) fail('이미 지난 시각이에요.');
+  if (v > now + 60 * DAY) fail('모이는 시각은 두 달 안으로 정해 주세요.');
+  return v;
+}
+function isAdmin(s: State, uid: Id) { return s.admins.includes(uid); }
 function room(s: State, id: Id) { return s.rooms[id] ?? fail('실험실을 찾을 수 없어요.'); }
 function notify(s: State, uid: Id, text: string, roomId: Id | undefined, now: number) {
   s.notifications.push({ id: nid(s, 'n'), userId: uid, text, roomId, createdAt: now, readAt: null });
@@ -113,6 +223,7 @@ function addMember(s: State, roomId: Id, uid: Id, via: 'create' | 'join' | 'auto
   if (isMember(s, roomId, uid)) fail('이미 이 실험실에 있어요.');
   const target = moleculeById(r.targetMoleculeId)!.atomCounts;
   if (!hasVacancy(target, roomCounts(s, roomId), u.elementId)) fail(`이 실험실에는 ${ELEMENTS[u.elementId].name} 자리가 남아 있지 않아요.`);
+  if (blockedWithRoom(s, uid, roomId)) fail('함께할 수 없는 사람이 있는 실험실이에요.');
   const others = activeMembers(s, roomId).map((m) => m.elementSnapshot);
   s.members.push({ roomId, userId: uid, elementSnapshot: u.elementId, introSnapshot: u.intro, joinedAt: now, leftAt: null, via,
     reason: via === 'auto' && others.length ? matchReason(u.elementId, others) : undefined });
@@ -186,7 +297,12 @@ function finalizeMeetingIfReady(s: State, meetingId: Id, now: number) {
       s.cards.push({ userId: a.userId, moleculeId: mt.matchedMoleculeId, visibility: 'private', firstEarnedAt: now });
     }
   }
-  const text = mt.matchedMoleculeId ? `첫 만남이 확인됐어요. 참석자 모두 ${molName(mt.matchedMoleculeId)} 카드를 얻었어요.`
+  delete mt.confirmLoc; // 만남이 확인되면 확인 위치는 지운다
+  if (s.users[r.hostId]?.sharingLocation && !hostsOpenRoom(s, r.hostId)) {
+    stopSharing(s, r.hostId);
+    notify(s, r.hostId, '첫 만남이 확인돼서 위치 공유를 껐어요.', r.id, now);
+  }
+  const text = mt.matchedMoleculeId ? `첫 만남이 확인됐어요. 참석자 모두 ${molName(mt.matchedMoleculeId)} 카드를 받을 수 있어요.`
     : '첫 만남이 확인됐어요. 참석 구성이 유효한 분자가 아니어서 카드 없이 만남 기록만 남았어요.';
   sys(s, r.id, text, now);
   sys(s, r.id, '연락처는 실제로 만난 친구끼리 직접 주고받아 주세요. 앱 안에는 개인 채팅이 없어요.', now);
@@ -218,6 +334,7 @@ export function findQueueGroup(s: State): { moleculeId: string; userIds: Id[] } 
       picked.push(...pool.map((q) => q.userId));
     }
     if (!ok) continue;
+    if (picked.some((a, i) => picked.slice(i + 1).some((b) => isBlockedPair(s, a, b)))) continue;
     const els = picked.map((id) => s.users[id].elementId!);
     cands.push({ moleculeId: m.id, userIds: picked, oldest: picked.includes(waiting[0].userId), score: complementScore(els),
       age: picked.reduce((t, id) => t + waiting.findIndex((q) => q.userId === id), 0) / picked.length });
@@ -260,7 +377,7 @@ function drainQueue(s: State, now: number) {
 export interface ApplyResult { state: State; createdId?: Id; info?: string }
 
 export function apply(prev: State, cmd: Command, now: number): ApplyResult {
-  const s: State = structuredClone(prev);
+  const s: State = normalize(structuredClone(prev));
   let createdId: Id | undefined; let info: string | undefined;
 
   switch (cmd.type) {
@@ -269,9 +386,11 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       const id = cmd.id ?? nid(s, 'u');
       const intro = cmd.intro.trim().slice(0, INTRO_MAX);
       s.users[id] = { id, universityId: 'demo-univ', elementId: null, elementLockedAt: null, intro, createdAt: now,
-        virtual: !!cmd.virtual, demoLabel: cmd.demoLabel ?? '나' };
+        virtual: !!cmd.virtual, demoLabel: cmd.demoLabel ?? '나', tags: [], sharingLocation: false, suspendedAt: null };
       if (cmd.elementId) { s.users[id].elementId = cmd.elementId; s.users[id].elementLockedAt = now; }
-      if (cmd.makeMe) s.meId = id;
+      if (cmd.nickname) s.users[id].nickname = cleanNickname(s, id, cmd.nickname);
+      else if (cmd.virtual) s.users[id].nickname = `${cmd.elementId ?? '원자'}${s.seq}`;
+      if (cmd.makeMe) { s.meId = id; if (!s.admins.includes(id)) s.admins.push(id); } // 시연에서는 나를 관리자로
       createdId = id; break;
     }
     case 'recordQuiz': {
@@ -304,7 +423,10 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       if (!m || !USABLE().includes(m)) fail('사용할 수 없는 분자예요.');
       if (!(m.atomCounts[u.elementId] ?? 0)) fail(`${m.formula}에는 ${ELEMENTS[u.elementId].name} 자리가 없어요.`);
       const days = Math.max(1, Math.min(14, Math.round(cmd.recruitDays ?? s.config.defaultRecruitDays)));
+      const name = cleanRoomName(cmd.name ?? '');
+      const meetAt = cleanMeetAt(cmd.meetAt, now);
       const id = createRoomInternal(s, u.id, m.id, cmd.chatPolicy, 'manual', now, days);
+      s.rooms[id].name = name; s.rooms[id].meetAt = meetAt;
       addMember(s, id, u.id, 'create', now);
       sys(s, id, cmd.chatPolicy === 'immediate' ? '실험실이 열렸어요. 들어오는 대로 대화할 수 있어요.' : '실험실이 열렸어요. 분자가 완성되면 채팅이 열려요.', now);
       createdId = id; break;
@@ -361,6 +483,7 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       const body = cmd.body.trim();
       if (!body) fail('메시지를 입력해 주세요.');
       if (!canChat(s, cmd.roomId, cmd.actor)) fail('지금은 이 실험실에서 채팅할 수 없어요.');
+      if (s.users[cmd.actor]?.suspendedAt) fail('신고가 쌓여 이용이 잠시 정지됐어요. 관리자 확인을 기다려 주세요.');
       s.messages.push({ id: nid(s, 'm'), roomId: cmd.roomId, senderId: cmd.actor, body: body.slice(0, 500), createdAt: now }); break;
     }
     case 'propose': {
@@ -455,6 +578,25 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       if (mt.status === 'confirmed' && cmd.response === 'confirm') { info = 'noop'; break; } // 중복 클릭: 아무것도 늘지 않음
       if (mt.status !== 'pending') fail('이미 끝난 만남 확인이에요.');
       if (mt.confirmations[cmd.actor] === 'confirmed' && cmd.response === 'confirm') { info = 'noop'; break; }
+      if (cmd.response === 'confirm' && s.config.meetingProximity.required) {
+        const P = s.config.meetingProximity, loc = cmd.loc;
+        if (!loc || !Number.isFinite(loc.lat) || !Number.isFinite(loc.lng)) fail('위치를 켜야 만남을 확인할 수 있어요. 위치를 켜야 카드를 받을 수 있어요.');
+        if (!(loc.acc <= P.maxAccuracyM)) fail(`위치가 정확하지 않아요 (오차 약 ${Math.round(loc.acc)}m). 건물 밖으로 나와서 다시 눌러 주세요.`);
+        mt.confirmAt ??= {}; mt.confirmLoc ??= {};
+        // 2시간이 지난 확인은 다시 받는다
+        for (const [uid, at] of Object.entries(mt.confirmAt)) {
+          if (mt.confirmations[uid] === 'confirmed' && now - at > P.windowMs) {
+            delete mt.confirmations[uid]; delete mt.confirmAt[uid]; delete mt.confirmLoc[uid];
+            notify(s, uid, '만남 확인이 2시간 안에 모두 모이지 않아 다시 확인해야 해요.', mt.roomId, now);
+          }
+        }
+        for (const [uid, other] of Object.entries(mt.confirmLoc)) {
+          if (uid !== cmd.actor && mt.confirmations[uid] === 'confirmed' && distanceM(loc, other) > P.radiusM)
+            fail(`먼저 확인한 참석자와 ${P.radiusM}m 넘게 떨어져 있어요. 함께 있을 때 눌러 주세요.`);
+        }
+        mt.confirmAt[cmd.actor] = now;
+        mt.confirmLoc[cmd.actor] = { lat: loc.lat, lng: loc.lng, acc: loc.acc };
+      }
       mt.confirmations[cmd.actor] = cmd.response === 'confirm' ? 'confirmed' : 'rejected';
       if (cmd.response === 'reject') {
         mt.status = 'rejected';
@@ -478,12 +620,118 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       const q = waitingEntry(s, cmd.actor); if (q) { q.status = 'cancelled'; q.resolvedAt = now; }
       break;
     }
+    case 'renameRoom': {
+      const r = room(s, cmd.roomId);
+      if (r.hostId !== cmd.actor) fail('방장만 실험실 이름을 바꿀 수 있어요.');
+      if (r.closedAt) fail('종료된 실험실이에요.');
+      r.name = cleanRoomName(cmd.name); r.meetAt = cleanMeetAt(cmd.meetAt, now);
+      sys(s, r.id, `방장이 실험실 이름을 '${r.name}'${r.meetAt ? '(으)로 정하고 모이는 시각을 적었어요.' : '(으)로 정했어요.'}`, now);
+      break;
+    }
+    case 'claimCard': {
+      const rec = s.records.find((x) => x.id === cmd.recordId && x.userId === cmd.actor) ?? fail('내 만남 기록이 아니에요.');
+      if (rec.claimedAt) { info = 'noop'; createdId = rec.moleculeId ?? undefined; break; }
+      rec.claimedAt = now; createdId = rec.moleculeId ?? undefined; break;
+    }
+    case 'updateProfile': {
+      const u = s.users[cmd.actor] ?? fail('사용자를 찾을 수 없어요.');
+      if (cmd.nickname !== undefined) u.nickname = cleanNickname(s, u.id, cmd.nickname);
+      if (cmd.tags !== undefined) {
+        const tags = [...new Set(cmd.tags)];
+        if (tags.length > TAGS_MAX) fail(`관심사는 ${TAGS_MAX}개까지 고를 수 있어요.`);
+        if (!tags.every((t) => INTEREST_TAGS.includes(t))) fail('목록에 있는 관심사만 고를 수 있어요.');
+        u.tags = tags;
+      }
+      break;
+    }
+    case 'review': {
+      const mt = s.meetings.find((m) => m.id === cmd.meetingId) ?? fail('만남을 찾을 수 없어요.');
+      if (mt.status !== 'confirmed') fail('실제 만남이 확인된 뒤에 반응을 남길 수 있어요.');
+      if (!mt.attendees.some((a) => a.userId === cmd.actor) || !mt.attendees.some((a) => a.userId === cmd.to)) fail('함께 만난 사람에게만 반응을 남길 수 있어요.');
+      if (cmd.to === cmd.actor) fail('나에게는 반응을 남길 수 없어요.');
+      if (s.reviews.some((r) => r.meetingId === mt.id && r.from === cmd.actor && r.to === cmd.to)) fail('이미 반응을 남겼어요.');
+      const tags = [...new Set(cmd.tags)];
+      if (!tags.length || tags.length > PRAISE_MAX) fail(`칭찬은 1~${PRAISE_MAX}개 골라 주세요.`);
+      if (!tags.every((t) => PRAISE.some((p) => p.id === t))) fail('목록에 있는 칭찬만 고를 수 있어요.');
+      s.reviews.push({ id: nid(s, 'rv'), meetingId: mt.id, from: cmd.actor, to: cmd.to, tags, createdAt: now });
+      break;
+    }
+    case 'report': {
+      if (!s.users[cmd.target]) fail('사용자를 찾을 수 없어요.');
+      if (cmd.target === cmd.actor) fail('나를 신고할 수는 없어요.');
+      if (!REPORT_REASONS.some((r) => r.id === cmd.reason)) fail('신고 사유를 골라 주세요.');
+      const detail = (cmd.detail ?? '').trim().slice(0, 300);
+      if (cmd.reason === 'other' && !detail) fail('기타 사유는 내용을 적어 주세요.');
+      if (s.reports.some((r) => r.from === cmd.actor && r.target === cmd.target && r.status === 'open')) fail('이미 신고했어요. 관리자가 확인하고 있어요.');
+      s.reports.push({ id: nid(s, 'rp'), from: cmd.actor, target: cmd.target, roomId: cmd.roomId ?? null, reason: cmd.reason, detail, createdAt: now, status: 'open', resolvedAt: null });
+      notify(s, cmd.actor, '신고가 접수됐어요. 관리자가 확인할게요. 신고한 사실은 상대에게 알리지 않아요.', undefined, now);
+      const reporters = new Set(s.reports.filter((r) => r.target === cmd.target && r.status !== 'dismissed').map((r) => r.from));
+      const t = s.users[cmd.target];
+      if (reporters.size >= s.config.suspendAfterReports && !t.suspendedAt) {
+        t.suspendedAt = now; stopSharing(s, t.id);
+        const q = waitingEntry(s, t.id); if (q) { q.status = 'cancelled'; q.resolvedAt = now; }
+        for (const a of s.admins) notify(s, a, `신고가 ${reporters.size}건 쌓여 ${t.nickname || '사용자'}님을 일시 정지했어요. 확인해 주세요.`, undefined, now);
+      }
+      for (const a of s.admins) if (a !== cmd.actor) notify(s, a, '새 신고가 들어왔어요.', undefined, now);
+      break;
+    }
+    case 'block': {
+      if (cmd.target === cmd.actor || !s.users[cmd.target]) fail('차단할 수 없는 사용자예요.');
+      if (!s.blocks.some((b) => b.from === cmd.actor && b.to === cmd.target)) s.blocks.push({ from: cmd.actor, to: cmd.target, createdAt: now });
+      break;
+    }
+    case 'unblock': {
+      s.blocks = s.blocks.filter((b) => !(b.from === cmd.actor && b.to === cmd.target)); break;
+    }
+    case 'setSharing': {
+      const u = s.users[cmd.actor] ?? fail('사용자를 찾을 수 없어요.');
+      if (cmd.on) {
+        if (!hostsOpenRoom(s, u.id)) fail('첫 만남 전인 실험실의 방장만 위치를 공유할 수 있어요.');
+        if (u.suspendedAt) fail('이용이 정지된 동안에는 위치를 공유할 수 없어요.');
+        u.sharingLocation = true;
+      } else stopSharing(s, u.id);
+      break;
+    }
+    case 'setLocation': {
+      const u = s.users[cmd.actor] ?? fail('사용자를 찾을 수 없어요.');
+      if (!u.sharingLocation) { info = 'noop'; break; }
+      if (!cmd.loc) { delete s.locations[u.id]; break; }
+      if (!isOnCampus(cmd.loc.lat, cmd.loc.lng)) {
+        stopSharing(s, u.id); info = 'offCampus';
+        notify(s, u.id, '캠퍼스를 벗어나서 위치 공유를 껐어요.', undefined, now);
+        break;
+      }
+      s.locations[u.id] = { lat: cmd.loc.lat, lng: cmd.loc.lng, acc: cmd.loc.acc, at: now }; // 마지막 위치 하나만
+      break;
+    }
+    case 'adminResolveReport': {
+      if (!isAdmin(s, cmd.actor)) fail('관리자만 할 수 있어요.');
+      const r = s.reports.find((x) => x.id === cmd.reportId) ?? fail('신고를 찾을 수 없어요.');
+      if (r.status !== 'open') fail('이미 처리한 신고예요.');
+      r.status = cmd.decision; r.resolvedAt = now;
+      notify(s, r.from, cmd.decision === 'upheld' ? '신고하신 내용이 확인되어 조치했어요.' : '신고하신 내용을 확인했지만 조치할 사항이 없었어요.', undefined, now);
+      break;
+    }
+    case 'adminSetSuspended': {
+      if (!isAdmin(s, cmd.actor)) fail('관리자만 할 수 있어요.');
+      const t = s.users[cmd.target] ?? fail('사용자를 찾을 수 없어요.');
+      if (cmd.suspended) {
+        t.suspendedAt = now; stopSharing(s, t.id);
+        const q = waitingEntry(s, t.id); if (q) { q.status = 'cancelled'; q.resolvedAt = now; }
+      } else { t.suspendedAt = null; notify(s, t.id, '이용 정지가 풀렸어요.', undefined, now); }
+      break;
+    }
+    case 'makeAdmin': {
+      if (!s.users[cmd.userId]) fail('사용자를 찾을 수 없어요.');
+      if (!s.admins.includes(cmd.userId)) s.admins.push(cmd.userId);
+      break;
+    }
     case 'readNotifications': {
       for (const n of s.notifications) if (n.userId === cmd.actor && !n.readAt) n.readAt = now;
       break;
     }
   }
-  if (cmd.type !== 'readNotifications' && cmd.type !== 'createUser') drainQueue(s, now);
+  if (!['readNotifications', 'createUser', 'setLocation', 'updateProfile', 'claimCard', 'review'].includes(cmd.type)) drainQueue(s, now);
   if (cmd.type === 'startAutoMatch' && info === 'queued') {
     const q = s.queue.find((x) => x.userId === cmd.actor && x.enteredAt === now);
     if (q?.status === 'matched') {

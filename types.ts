@@ -6,6 +6,13 @@ export type Id = string;
 export interface User {
   id: Id; universityId: string; elementId: ElementId | null; elementLockedAt: number | null;
   intro: string; createdAt: number; virtual: boolean; demoLabel: string;
+  /** 닉네임 (2~10자, 중복 불가). 예전 계정은 비어 있을 수 있다 */
+  nickname?: string;
+  tags?: string[];
+  /** 방장 위치 공유를 켰는지 */
+  sharingLocation?: boolean;
+  /** 신고 누적으로 일시 정지된 시각 */
+  suspendedAt?: number | null;
 }
 
 export type ChatPolicy = 'immediate' | 'afterComplete';
@@ -17,6 +24,10 @@ export interface Room {
   createdAt: number; completedAt: number | null; deadline: number;
   firstMeetingConfirmedAt: number | null; firstMeetingMoleculeId: string | null;
   closedAt: number | null; closeReason: 'host' | 'deadline' | 'empty' | null;
+  /** 실험실 이름 (직접 만든 실험실은 필수, 자동 매칭 실험실은 방장이 나중에 정함) */
+  name?: string | null;
+  /** 모이는 시각 (선택) */
+  meetAt?: number | null;
 }
 
 export interface RoomMember {
@@ -36,9 +47,13 @@ export interface Message { id: Id; roomId: Id; senderId: Id | null; body: string
 
 export interface AttendeeSnap { userId: Id; element: ElementId; intro: string }
 
+export interface GeoPoint { lat: number; lng: number; acc: number }
 export interface Meeting {
   id: Id; roomId: Id; proposedBy: Id; attendees: AttendeeSnap[];
   confirmations: Record<Id, 'confirmed' | 'rejected'>;
+  /** 확인을 누른 시각·위치 (100m 규칙 판정용). 만남이 끝나면 위치는 지운다 */
+  confirmAt?: Record<Id, number>;
+  confirmLoc?: Record<Id, GeoPoint>;
   status: 'pending' | 'confirmed' | 'rejected' | 'superseded';
   matchedMoleculeId: string | null; createdAt: number; confirmedAt: number | null;
 }
@@ -48,7 +63,18 @@ export interface CollectionCard { userId: Id; moleculeId: string; visibility: Vi
 export interface MeetingRecord {
   id: Id; userId: Id; meetingId: Id; roomId: Id; moleculeId: string | null; targetMoleculeId: string;
   companions: { element: ElementId; intro: string }[]; visibility: Visibility; createdAt: number;
+  /** "분자 카드 받기"를 누른 시각. 누르기 전에는 카드가 포장된 채로 기다린다 */
+  claimedAt?: number | null;
 }
+
+export interface Review { id: Id; meetingId: Id; from: Id; to: Id; tags: string[]; createdAt: number }
+export type ReportReason = 'rude' | 'noshow' | 'spam' | 'inappropriate' | 'other';
+export interface Report {
+  id: Id; from: Id; target: Id; roomId: Id | null; reason: ReportReason; detail: string; createdAt: number;
+  status: 'open' | 'upheld' | 'dismissed'; resolvedAt: number | null;
+}
+export interface Block { from: Id; to: Id; createdAt: number }
+export interface LastLocation { lat: number; lng: number; acc: number; at: number }
 
 export interface Notification { id: Id; userId: Id; text: string; roomId?: Id; createdAt: number; readAt: number | null }
 
@@ -59,6 +85,10 @@ export interface Config {
   defaultRecruitDays: number;
   /** 투표 응답 기한 (미정 사항 → 설정값) */
   proposalHours: number;
+  /** 만남 확인 위치 규칙 */
+  meetingProximity: { required: boolean; radiusM: number; windowMs: number; maxAccuracyM: number };
+  /** 이만큼 다른 사람에게 신고되면 자동 일시 정지 */
+  suspendAfterReports: number;
 }
 
 export interface State {
@@ -66,6 +96,10 @@ export interface State {
   users: Record<Id, User>; rooms: Record<Id, Room>; members: RoomMember[]; queue: QueueEntry[];
   proposals: Proposal[]; messages: Message[]; meetings: Meeting[];
   cards: CollectionCard[]; records: MeetingRecord[]; notifications: Notification[]; quizAttempts: QuizAttempt[];
+  reviews: Review[]; reports: Report[]; blocks: Block[];
+  /** 방장 위치: 사용자당 마지막 한 곳만 */
+  locations: Record<Id, LastLocation>;
+  admins: Id[];
   config: Config;
 }
 
