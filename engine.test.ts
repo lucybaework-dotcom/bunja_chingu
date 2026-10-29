@@ -1,3 +1,4 @@
+import { TERMS_VERSION } from './engine';
 import { describe, expect, it } from 'vitest';
 import { apply, emptyState, activeMembers, canChat, hasConflict, recruitingCommitments, findQueueGroup, type Command } from './engine';
 import { exactMatches, supersetCandidates, countsOf, usableElements } from './chemistry';
@@ -121,7 +122,7 @@ describe('확장 원소', () => {
 describe('1. 원소 테스트와 확정', () => {
   it('테스트 재응시, 추천과 다른 원소 선택, 확정 후 변경 불가', () => {
     const h = harness();
-    const me = h.run({ type: 'createUser', intro: '안녕', makeMe: true }).createdId!;
+    const me = h.run({ type: 'createUser', intro: '안녕', makeMe: true, consentVersion: TERMS_VERSION }).createdId!;
     h.run({ type: 'recordQuiz', actor: me, answers: allAnswers(0) });
     h.run({ type: 'recordQuiz', actor: me, answers: allAnswers(1) });
     expect(h.s.quizAttempts.length).toBe(2);

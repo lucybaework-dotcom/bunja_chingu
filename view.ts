@@ -39,6 +39,7 @@ export function viewFor(s: State, uid: string, here?: { lat: number; lng: number
     blocks: s.blocks.filter((b) => b.from === uid),
     locations,
     admins: admin ? [uid] : [],
+    pushSubs: s.pushSubs[uid] ? { [uid]: s.pushSubs[uid].map((x) => ({ ...x, keys: { p256dh: '', auth: '' } })) } : {},
     profiles,
     isAdmin: admin,
   };

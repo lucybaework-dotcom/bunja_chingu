@@ -1,5 +1,6 @@
 // Supabase Edge Function 진입점 (Deno). 빌드하면 server-dist/bunja-function.js 한 파일이 된다.
 import { handle, type Deps } from './handler';
+import { b64u, sendWebPush, type VapidKeys } from './webpush';
 import type { State } from './types';
 
 declare const Deno: { env: { get(k: string): string | undefined }; serve(h: (r: Request) => Response | Promise<Response>): void };
@@ -40,7 +41,26 @@ const deps: Deps = {
     await rest('app_version?id=eq.1', { method: 'PATCH', body: JSON.stringify({ version: Date.now(), updated_at: new Date().toISOString() }) });
   },
   now: () => Date.now(),
+  async deleteAuthUser(uid) {
+    const r = await fetch(`${URL_}/auth/v1/admin/users/${uid}`, { method: 'DELETE', headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } });
+    if (!r.ok) console.error('delete auth user', r.status, await r.text().catch(() => ''));
+  },
+  ...(vapid() ? { sendPush: (sub, data) => sendWebPush(sub, data, vapid()!).catch((e) => { console.error('push', e); return 0; }) } : {}),
 };
+
+/** Supabase 비밀값 VAPID_PRIVATE_JWK가 있을 때만 알림을 보낸다 */
+let vapidCache: VapidKeys | null | undefined;
+function vapid(): VapidKeys | null {
+  if (vapidCache !== undefined) return vapidCache;
+  try {
+    const raw = Deno.env.get('VAPID_PRIVATE_JWK');
+    if (!raw) return (vapidCache = null);
+    const jwk = JSON.parse(raw) as JsonWebKey & { x: string; y: string };
+    const pub = new Uint8Array([4, ...b64u.dec(jwk.x), ...b64u.dec(jwk.y)]);
+    vapidCache = { privateJwk: jwk, publicKey: b64u.enc(pub), subject: Deno.env.get('VAPID_SUBJECT') ?? 'mailto:lucybae@kookmin.ac.kr' };
+  } catch (e) { console.error('VAPID_PRIVATE_JWK 형식 오류', e); vapidCache = null; }
+  return vapidCache;
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',

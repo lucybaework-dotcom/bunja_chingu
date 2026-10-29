@@ -13,6 +13,10 @@ export interface User {
   sharingLocation?: boolean;
   /** 신고 누적으로 일시 정지된 시각 */
   suspendedAt?: number | null;
+  /** 동의한 약관 버전과 시각 */
+  consentVersion?: string; consentAt?: number;
+  /** 탈퇴한 시각. 탈퇴하면 개인 정보는 지우고 자리만 남긴다 */
+  deletedAt?: number | null;
 }
 
 export type ChatPolicy = 'immediate' | 'afterComplete';
@@ -28,6 +32,8 @@ export interface Room {
   name?: string | null;
   /** 모이는 시각 (선택) */
   meetAt?: number | null;
+  /** 약속 장소 (방장이 지도에서 찍음) */
+  place?: { lat: number; lng: number; label: string } | null;
 }
 
 export interface RoomMember {
@@ -75,6 +81,8 @@ export interface Report {
 }
 export interface Block { from: Id; to: Id; createdAt: number }
 export interface LastLocation { lat: number; lng: number; acc: number; at: number }
+/** 웹 푸시 구독 (브라우저가 준 값 그대로) */
+export interface PushSub { endpoint: string; keys: { p256dh: string; auth: string }; at: number }
 
 export interface Notification { id: Id; userId: Id; text: string; roomId?: Id; createdAt: number; readAt: number | null }
 
@@ -99,6 +107,8 @@ export interface State {
   reviews: Review[]; reports: Report[]; blocks: Block[];
   /** 방장 위치: 사용자당 마지막 한 곳만 */
   locations: Record<Id, LastLocation>;
+  /** 알림 구독: 사용자별 기기 목록 */
+  pushSubs: Record<Id, PushSub[]>;
   admins: Id[];
   config: Config;
 }

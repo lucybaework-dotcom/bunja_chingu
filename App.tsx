@@ -1,3 +1,4 @@
+import { ConsentChecks, DeleteAccount, DocSheet, InstallCard, PlaceCard, PushToggle, TermsUpdateCard } from './Extras';
 import { j, josaOf } from './josa';
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ELEMENTS, METAPHOR_NOTICE, pairContent } from './elements';
@@ -7,7 +8,7 @@ import type { Backend, DispatchResult } from './backend';
 import { countsOf, exactMatches, moleculesWith, supersetCandidates, usableElements, vacancies } from './chemistry';
 import {
   activeMembers, canChat, getProfile, hasConflict, INTRO_MAX, isMember, isRecruitingOpen, joinableRoomsFor, openProposal, pendingMeeting,
-  recruitingCommitments, roomCounts, roomTitle, ROOM_NAME_MAX, waitingEntry, type Command,
+  recruitingCommitments, roomCounts, roomTitle, ROOM_NAME_MAX, TERMS_VERSION, waitingEntry, type Command,
 } from './engine';
 import type { MeetingRecord, Room, State } from './types';
 import { USABLE } from './molecules';
@@ -106,7 +107,12 @@ export default function App({ backend }: { backend: Backend }) {
     });
   }, [sharing, vid]); // eslint-disable-line react-hooks/exhaustive-deps
   let body: JSX.Element;
-  if (!me) body = <Intro onStart={async () => { const r = await run({ type: 'createUser', intro: '', makeMe: true }); if (r.ok) setViewer(r.createdId!); }} />;
+  // 알림을 눌러 #room-<id>로 열리면 그 실험실로 간다
+  useEffect(() => {
+    const open = () => { const m = /^#room-(.+)$/.exec(location.hash); if (m && s.rooms[m[1]]) { go({ k: 'room', id: m[1] }); history.replaceState(null, '', location.pathname + location.search); } };
+    open(); window.addEventListener('hashchange', open); return () => window.removeEventListener('hashchange', open);
+  }, [!!s.rooms]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!me || me.deletedAt) body = <Intro onStart={async () => { const r = await run({ type: 'createUser', intro: '', makeMe: true, consentVersion: TERMS_VERSION }); if (r.ok) setViewer(r.createdId!); }} />;
   else if (!me.elementLockedAt) body = <Onboarding />;
   else body = <Screen />;
   const onboarded = !!me?.elementLockedAt;
@@ -206,6 +212,7 @@ function NotifBell() {
 
 // ───────── 1. 소개 ─────────
 function Intro({ onStart }: { onStart: () => void }) {
+  const [ok, setOk] = useState(false);
   return (
     <div className="stack" style={{ gap: 20 }}>
       <section className="hero">
@@ -230,7 +237,8 @@ function Intro({ onStart }: { onStart: () => void }) {
         ))}
       </div>
       <p className="small muted">{METAPHOR_NOTICE}</p>
-      <button className="btn primary block" onClick={onStart}>내 원소 찾기 시작</button>
+      <ConsentChecks onChange={setOk} />
+      <button className="btn primary block" disabled={!ok} onClick={onStart}>{ok ? '동의하고 내 원소 찾기 시작' : '필수 항목에 동의해 주세요'}</button>
     </div>
   );
 }
@@ -386,6 +394,7 @@ function Home() {
           <p className="small muted">“{me.intro}”</p>
         </div>
       </div>
+      {!me.virtual && me.consentVersion !== TERMS_VERSION && <TermsUpdateCard viewer={viewer} run={run} />}
       {!me.nickname && (
         <form className="panel warn" onSubmit={async (e) => { e.preventDefault(); await run({ type: 'updateProfile', actor: viewer, nickname: nick }, '닉네임을 정했어요.'); }}>
           <h3>닉네임을 정해 주세요</h3>
@@ -443,7 +452,7 @@ function RoomCard({ room, compact }: { room: Room; compact?: boolean }) {
       <div className="row between" style={{ alignItems: 'flex-start' }}>
         <div className="stack-s grow" style={{ gap: 2, minWidth: 0 }}>
           <strong className="room-name">{room.name || <span className="muted">이름 없는 실험실</span>}</strong>
-          <span className="small muted"><Formula f={m.formula} className="mono" /> {m.name} · {m.totalAtoms}명{m.kind === 'ionic' ? ' · 이온 결정' : ''}{room.meetAt ? ` · ${fmtTime(room.meetAt)}` : ''}</span>
+          <span className="small muted"><Formula f={m.formula} className="mono" /> {m.name} · {m.totalAtoms}명{m.kind === 'ionic' ? ' · 이온 결정' : ''}{room.meetAt ? ` · ${fmtTime(room.meetAt)}` : ''}{room.place ? ` · 📍${room.place.label}` : ''}</span>
         </div>
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <span className={`chip ${st.cls}`}>{st.label}</span>
@@ -470,11 +479,21 @@ function RoomCard({ room, compact }: { room: Room; compact?: boolean }) {
 
 // ───────── 5. 실험실 목록 ─────────
 function RoomsList() {
-  const { s, viewer, go } = useApp();
+  const { s, viewer, go, now } = useApp();
   const [tab, setTab] = useState<'mine' | 'all'>('mine');
+  const [sort, setSort] = useState<'new' | 'soon' | 'full'>('new');
+  const [today, setToday] = useState(false);
+  const [size, setSize] = useState(0);
   const joinable = joinableRoomsFor(s, viewer);
   const all = Object.values(s.rooms).filter(isRecruitingOpen);
-  const list = (tab === 'mine' ? joinable : all).sort((a, b) => b.createdAt - a.createdAt);
+  const fill = (r: Room) => activeMembers(s, r.id).length / moleculeById(r.targetMoleculeId)!.totalAtoms;
+  const d0 = new Date(now); d0.setHours(0, 0, 0, 0); const d1 = d0.getTime() + 86_400_000;
+  const list = (tab === 'mine' ? joinable : all)
+    .filter((r) => !today || (r.meetAt != null && r.meetAt >= d0.getTime() && r.meetAt < d1))
+    .filter((r) => !size || moleculeById(r.targetMoleculeId)!.totalAtoms === size)
+    .sort((a, b) => sort === 'soon' ? (a.meetAt ?? Infinity) - (b.meetAt ?? Infinity) || b.createdAt - a.createdAt
+      : sort === 'full' ? fill(b) - fill(a) || b.createdAt - a.createdAt : b.createdAt - a.createdAt);
+  const filtered = today || size > 0;
   const el = s.users[viewer].elementId!;
   return (
     <div className="stack">
@@ -483,7 +502,16 @@ function RoomsList() {
         <button role="tab" aria-selected={tab === 'mine'} className={tab === 'mine' ? 'on' : ''} onClick={() => setTab('mine')}>{ELEMENTS[el].name} 자리 있는 실험실 {joinable.length}</button>
         <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>모집 중 전체 {all.length}</button>
       </div>
-      {list.length === 0 && <div className="panel flat"><p className="small muted">지금은 {tab === 'mine' ? `${ELEMENTS[el].name} 자리가 남은 실험실이 없어요. 새 실험실을 만들거나 자동 매칭으로 기다려 보세요.` : '모집 중인 실험실이 없어요.'}</p></div>}
+      <div className="filters">
+        <label className="sr-only" htmlFor="room-sort">정렬</label>
+        <select id="room-sort" className="input sm" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+          <option value="new">최근에 열린 순</option><option value="soon">모이는 시각 빠른 순</option><option value="full">거의 다 찬 순</option>
+        </select>
+        <button className={`chip pick${today ? ' on' : ''}`} aria-pressed={today} onClick={() => setToday(!today)}>오늘 모임</button>
+        {[2, 3, 4, 5, 6].map((n) => <button key={n} className={`chip pick${size === n ? ' on' : ''}`} aria-pressed={size === n} onClick={() => setSize(size === n ? 0 : n)}>{n}명</button>)}
+      </div>
+      {list.length === 0 && filtered && <div className="panel flat"><p className="small muted">조건에 맞는 실험실이 없어요.</p><button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => { setToday(false); setSize(0); }}>필터 지우기</button></div>}
+      {list.length === 0 && !filtered && <div className="panel flat"><p className="small muted">지금은 {tab === 'mine' ? `${ELEMENTS[el].name} 자리가 남은 실험실이 없어요. 새 실험실을 만들거나 자동 매칭으로 기다려 보세요.` : '모집 중인 실험실이 없어요.'}</p></div>}
       {list.map((r) => <RoomCard key={r.id} room={r} />)}
     </div>
   );
@@ -613,6 +641,7 @@ function RoomDetail({ id }: { id: string }) {
       </div>
       {member && r.hostId === viewer && !r.closedAt && <RoomInfoEditor room={r} />}
       {member && <ClaimPanel room={r} />}
+      {member && <PlaceCard room={r} isHost={r.hostId === viewer} run={run} viewer={viewer} />}
       {member && r.hostId === viewer && !r.closedAt && r.firstMeetingConfirmedAt === null && <LocationShare />}
       {r.originalMoleculeId !== r.targetMoleculeId && <p className="small muted">처음 목표는 {molName(r.originalMoleculeId)}였어요.</p>}
       {r.firstMeetingConfirmedAt && (
@@ -1015,6 +1044,7 @@ function PublicPreview() {
 function Profile() {
   const { s, viewer, run, go, backend, openProfile } = useApp();
   const [out, setOut] = useState(false);
+  const [doc, setDoc] = useState<'terms' | 'privacy' | null>(null);
   const me = s.users[viewer];
   const [intro, setIntro] = useState(me.intro);
   const [nick, setNick] = useState(me.nickname ?? '');
@@ -1067,7 +1097,21 @@ function Profile() {
       )}
       {isAdminView(s, viewer) && <button className="btn block" onClick={() => go({ k: 'admin' })}>관리자 화면 · 처리 전 신고 {s.reports.filter((r) => r.status === 'open').length}</button>}
       <p className="small muted">{METAPHOR_NOTICE}</p>
+      <section className="stack-s">
+        <h2>앱과 알림</h2>
+        <InstallCard />
+        <PushToggle viewer={viewer} run={run} demo={backend.mode === 'demo'} />
+      </section>
+      <div className="row" style={{ justifyContent: 'center' }}>
+        <button className="linkish small" onClick={() => setDoc('terms')}>이용약관</button><span className="small muted">·</span>
+        <button className="linkish small" onClick={() => setDoc('privacy')}>개인정보 처리방침</button>
+      </div>
+      {doc && <DocSheet which={doc} onClose={() => setDoc(null)} />}
       {backend.signOut && <button className="btn block" disabled={out} onClick={async () => { setOut(true); await backend.signOut!(); location.reload(); }}>로그아웃</button>}
+      <DeleteAccount viewer={viewer} run={run} onDeleted={async () => {
+        if (backend.signOut) { await backend.signOut().catch(() => undefined); location.reload(); }
+        else go({ k: 'home' });
+      }} />
     </div>
   );
 }

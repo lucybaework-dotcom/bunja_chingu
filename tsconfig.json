@@ -5,5 +5,5 @@
     "skipLibCheck": true, "isolatedModules": true, "noUnusedLocals": true, "types": ["vitest/globals", "vite/client"]
   },
   "include": ["*.ts", "*.tsx"],
-  "exclude": ["vite.config.ts", "node_modules", "dist", "dist-demo"]
+  "exclude": ["vite.config.ts", "pwa-plugin.ts", "pwa-icons.ts", "node_modules", "dist", "dist-demo"]
 }

@@ -1,3 +1,4 @@
+import { TERMS_VERSION } from './engine';
 import { describe, expect, it } from 'vitest';
 import { apply, emptyState, canViewProfile, hostPins, joinableRoomsFor, reactionOf, type Command } from './engine';
 import { viewFor } from './view';
@@ -45,7 +46,7 @@ describe('실험실 이름과 시각', () => {
 describe('닉네임과 프로필', () => {
   it('닉네임 없으면 실험실 이용 불가, 중복 불가', () => {
     const x = h();
-    const me = x.run({ type: 'createUser', intro: '안녕' }).createdId!;
+    const me = x.run({ type: 'createUser', intro: '안녕', consentVersion: TERMS_VERSION }).createdId!;
     x.run({ type: 'lockElement', actor: me, elementId: 'H', acknowledged: true });
     expect(x.err({ type: 'createRoom', actor: me, moleculeId: 'h2', chatPolicy: 'immediate', name: '방' })).toMatch(/닉네임/);
     x.user('O', '산소짱');
@@ -131,7 +132,7 @@ describe('반응도 리뷰', () => {
 describe('신고·차단·관리자', () => {
   it('서로 다른 3명이 신고하면 자동 정지, 관리자 확정은 반응도 -5', () => {
     const x = h(); const bad = x.user('H'), r1 = x.user('O'), r2 = x.user('O'), r3 = x.user('O');
-    const admin = x.run({ type: 'createUser', intro: '관리', makeMe: true }).createdId!;
+    const admin = x.run({ type: 'createUser', intro: '관리', makeMe: true, consentVersion: TERMS_VERSION }).createdId!;
     x.run({ type: 'report', actor: r1, target: bad, reason: 'rude', detail: '' });
     expect(x.err({ type: 'report', actor: r1, target: bad, reason: 'rude', detail: '' })).toMatch(/이미/);
     expect(x.err({ type: 'report', actor: r2, target: bad, reason: 'other', detail: '' })).toMatch(/내용/);
@@ -203,9 +204,9 @@ describe('서버: 관리자 메일', () => {
       save: async (prev, next) => { if ((row?.version ?? null) !== prev) return false; row = { version: (prev ?? 0) + 1, state: structuredClone(next) }; return true; },
       bump: async () => {}, now: () => 5_000_000,
     };
-    const L = await handle('lucy', { action: 'dispatch', cmd: { type: 'createUser', intro: '관리자', nickname: '루시' } }, deps);
+    const L = await handle('lucy', { action: 'dispatch', cmd: { type: 'createUser', intro: '관리자', nickname: '루시', consentVersion: TERMS_VERSION } }, deps);
     expect((L.body.view as any).isAdmin).toBe(true);
-    const X = await handle('x', { action: 'dispatch', cmd: { type: 'createUser', intro: 'x', nickname: '엑스' } }, deps);
+    const X = await handle('x', { action: 'dispatch', cmd: { type: 'createUser', intro: 'x', nickname: '엑스', consentVersion: TERMS_VERSION } }, deps);
     expect((X.body.view as any).isAdmin).toBe(false);
     const bad = await handle('x', { action: 'dispatch', cmd: { type: 'adminSetSuspended', target: 'L', suspended: true } }, deps);
     expect(bad.body.ok).toBe(false);

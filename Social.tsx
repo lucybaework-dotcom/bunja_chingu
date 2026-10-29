@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { ELEMENTS } from './elements';
 import { moleculeById } from './molecules';
-import { INTEREST_TAGS, PRAISE, PRAISE_MAX, REACTION, REPORT_REASONS, TAGS_MAX } from './social';
+import { INTEREST_TAGS, PRAISE, PRAISE_MAX, REACTION, REPORT_REASONS, TAGS_MAX } from './socialData';
 import { getProfile, NICK_MAX, roomTitle, type Command } from './engine';
 import type { DispatchResult } from './backend';
 import type { ReportReason, State } from './types';

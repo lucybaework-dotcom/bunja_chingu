@@ -1,3 +1,4 @@
+import { TERMS_VERSION } from './engine';
 import { describe, expect, it } from 'vitest';
 import { handle, type Deps } from './handler';
 import type { State } from './types';
@@ -29,7 +30,7 @@ function fakeServer() {
 }
 
 async function onboard(f: ReturnType<typeof fakeServer>, tok: string, el: string) {
-  await f.d(tok, { type: 'createUser', intro: `${el} 친구` });
+  await f.d(tok, { type: 'createUser', intro: `${el} 친구`, consentVersion: TERMS_VERSION });
   await f.d(tok, { type: 'updateProfile', nickname: `닉${tok.slice(-1)}` });
   await f.d(tok, { type: 'lockElement', elementId: el, acknowledged: true });
 }
@@ -78,8 +79,8 @@ describe('서버 처리', () => {
     const f = fakeServer();
     await onboard(f, 'tok-a', 'H');
     expect((await f.d('tok-a', { type: 'expireRecruitment', roomId: 'r1' })).ok).toBe(false);
-    expect((await f.d('tok-a', { type: 'createUser', intro: 'x' })).ok).toBe(false); // 이미 있음
-    await f.d('tok-c', { type: 'createUser', id: 'A', intro: '사칭', elementId: 'O' });
+    expect((await f.d('tok-a', { type: 'createUser', intro: 'x', consentVersion: TERMS_VERSION })).ok).toBe(false); // 이미 있음
+    await f.d('tok-c', { type: 'createUser', id: 'A', intro: '사칭', elementId: 'O', consentVersion: TERMS_VERSION });
     expect(f.row!.state.users['C'].elementId).toBeNull(); // id·원소는 무시하고 본인 계정만
     expect(f.row!.state.users['A'].intro).toBe('H 친구');
   });
@@ -124,7 +125,7 @@ describe('화면 쪽 서버 연결', () => {
     const a = new RemoteBackend(transport('tok-a')), b = new RemoteBackend(transport('tok-b'));
     await a.start(); await b.start(); a.stop(); b.stop();
     expect(a.getState().meId).toBeNull();
-    expect((await a.dispatch({ type: 'createUser', intro: '산소예요' } as any)).ok).toBe(true);
+    expect((await a.dispatch({ type: 'createUser', intro: '산소예요', consentVersion: TERMS_VERSION } as any)).ok).toBe(true);
     expect(a.getState().meId).toBe('A');
     await a.dispatch({ type: 'updateProfile', actor: 'A', nickname: '산소짱' });
     await a.dispatch({ type: 'lockElement', actor: 'whoever', elementId: 'O', acknowledged: true });

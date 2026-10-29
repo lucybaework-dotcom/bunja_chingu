@@ -7,10 +7,10 @@ import { contains, countsOf, exactMatches, hasVacancy, sameCounts, supersetCandi
 import { complementScore, matchReason, RECOMMEND_CONFIG } from './recommend';
 import { DomainError, type ChatPolicy, type GeoPoint, type Id, type Proposal, type ReportReason, type Room, type State, type Visibility } from './types';
 import { distanceM, isOnCampus } from './campus';
-import { INTEREST_TAGS, PRAISE, PRAISE_MAX, REACTION, REPORT_REASONS, TAGS_MAX } from './social';
+import { INTEREST_TAGS, PRAISE, PRAISE_MAX, REACTION, REPORT_REASONS, TAGS_MAX } from './socialData';
 
 export type Command =
-  | { type: 'createUser'; id?: Id; intro: string; virtual?: boolean; demoLabel?: string; elementId?: ElementId; makeMe?: boolean; nickname?: string }
+  | { type: 'createUser'; id?: Id; intro: string; virtual?: boolean; demoLabel?: string; elementId?: ElementId; makeMe?: boolean; nickname?: string; consentVersion?: string }
   | { type: 'recordQuiz'; actor: Id; answers: Record<string, number> }
   | { type: 'lockElement'; actor: Id; elementId: ElementId; acknowledged: boolean }
   | { type: 'updateIntro'; actor: Id; intro: string }
@@ -27,6 +27,11 @@ export type Command =
   | { type: 'adminResolveReport'; actor: Id; reportId: Id; decision: 'upheld' | 'dismissed' }
   | { type: 'adminSetSuspended'; actor: Id; target: Id; suspended: boolean }
   | { type: 'makeAdmin'; userId: Id }
+  | { type: 'deleteAccount'; actor: Id; confirm: string }
+  | { type: 'acceptTerms'; actor: Id; version: string }
+  | { type: 'setPlace'; actor: Id; roomId: Id; place: { lat: number; lng: number; label: string } | null }
+  | { type: 'savePush'; actor: Id; sub: { endpoint: string; keys: { p256dh: string; auth: string } } }
+  | { type: 'removePush'; actor: Id; endpoint: string }
   | { type: 'joinRoom'; actor: Id; roomId: Id }
   | { type: 'leaveRoom'; actor: Id; roomId: Id }
   | { type: 'startAutoMatch'; actor: Id }
@@ -45,6 +50,9 @@ export type Command =
   | { type: 'readNotifications'; actor: Id };
 
 export const INTRO_MAX = 40;
+/** 지금 약관 버전. 바꾸면 기존 사용자에게 다시 동의를 받는다 */
+export const TERMS_VERSION = '2026-10-29';
+export const DELETE_WORD = '탈퇴';
 export const NICK_MIN = 2, NICK_MAX = 10, ROOM_NAME_MIN = 2, ROOM_NAME_MAX = 30;
 /** 방장 위치가 이보다 오래되면 지도에서 숨긴다 */
 export const LOCATION_FRESH_MS = 15 * 60_000;
@@ -60,7 +68,7 @@ export function emptyState(): State {
   return {
     version: 1, seq: 1, meId: null, users: {}, rooms: {}, members: [], queue: [], proposals: [], messages: [],
     meetings: [], cards: [], records: [], notifications: [], quizAttempts: [],
-    reviews: [], reports: [], blocks: [], locations: {}, admins: [],
+    reviews: [], reports: [], blocks: [], locations: {}, pushSubs: {}, admins: [],
     config: structuredClone(DEFAULT_CONFIG),
   };
 }
@@ -71,6 +79,7 @@ export function normalize(s: State): State {
   const out = { ...d, ...s, config: { ...d.config, ...(s.config ?? {}) } } as State;
   for (const k of ['reviews', 'reports', 'blocks', 'admins'] as const) if (!Array.isArray(out[k])) (out as any)[k] = [];
   if (!out.locations) out.locations = {};
+  if (!out.pushSubs) out.pushSubs = {};
   return out;
 }
 
@@ -117,6 +126,7 @@ export const roomTitle = (r: Room) => r.name || `${moleculeById(r.targetMolecule
 /** 같은 실험실(종료 전)에 viewer가 지금 있고 target이 한 번이라도 있었으면 프로필을 볼 수 있다 */
 export function canViewProfile(s: State, viewer: Id, target: Id): boolean {
   if (viewer === target) return true;
+  if (s.users[target]?.deletedAt) return false;
   return s.members.some((m) => m.userId === viewer && m.leftAt === null && s.rooms[m.roomId]?.closedAt === null
     && s.members.some((o) => o.roomId === m.roomId && o.userId === target));
 }
@@ -169,6 +179,7 @@ function nid(s: State, p: string) { return `${p}${s.seq++}`; }
 function fail(msg: string): never { throw new DomainError(msg); }
 function lockedUser(s: State, uid: Id) {
   const u = s.users[uid] ?? fail('사용자를 찾을 수 없어요.');
+  if (u.deletedAt) fail('탈퇴한 계정이에요.');
   if (!u.elementId || !u.elementLockedAt) fail('원소를 먼저 확정해 주세요.');
   if (!u.nickname) fail('닉네임을 먼저 정해 주세요.');
   if (u.suspendedAt) fail('신고가 쌓여 이용이 잠시 정지됐어요. 관리자 확인을 기다려 주세요.');
@@ -391,6 +402,10 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       if (cmd.nickname) s.users[id].nickname = cleanNickname(s, id, cmd.nickname);
       else if (cmd.virtual) s.users[id].nickname = `${cmd.elementId ?? '원자'}${s.seq}`;
       if (cmd.makeMe) { s.meId = id; if (!s.admins.includes(id)) s.admins.push(id); } // 시연에서는 나를 관리자로
+      if (!cmd.virtual) {
+        if (cmd.consentVersion !== TERMS_VERSION) fail('이용약관과 개인정보 처리방침에 동의해 주세요.');
+        s.users[id].consentVersion = TERMS_VERSION; s.users[id].consentAt = now;
+      }
       createdId = id; break;
     }
     case 'recordQuiz': {
@@ -721,6 +736,63 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       } else { t.suspendedAt = null; notify(s, t.id, '이용 정지가 풀렸어요.', undefined, now); }
       break;
     }
+    case 'deleteAccount': {
+      const u = s.users[cmd.actor] ?? fail('사용자를 찾을 수 없어요.');
+      if (u.deletedAt) { info = 'noop'; break; }
+      if (cmd.confirm.trim() !== DELETE_WORD) fail(`확인을 위해 '${DELETE_WORD}'라고 입력해 주세요.`);
+      let next: State = s;
+      // 열린 실험실에서는 모두 나간다 (방장이면 다음 사람에게 넘어간다)
+      for (const m of next.members.filter((x) => x.userId === u.id && x.leftAt === null)) {
+        if (next.rooms[m.roomId]?.closedAt === null) next = apply(next, { type: 'leaveRoom', actor: u.id, roomId: m.roomId }, now).state;
+      }
+      const q = waitingEntry(next, u.id); if (q) { q.status = 'cancelled'; q.resolvedAt = now; }
+      const t = next.users[u.id];
+      stopSharing(next, u.id);
+      // 내 개인 정보와 내 기록은 지운다. 다른 사람의 만남 기록에 남은 원소·소개 스냅샷은 그 사람의 기록이라 그대로 둔다.
+      next.cards = next.cards.filter((c) => c.userId !== u.id);
+      next.records = next.records.filter((r) => r.userId !== u.id);
+      next.quizAttempts = next.quizAttempts.filter((x) => x.userId !== u.id);
+      next.notifications = next.notifications.filter((x) => x.userId !== u.id);
+      next.blocks = next.blocks.filter((b) => b.from !== u.id && b.to !== u.id);
+      next.reviews = next.reviews.filter((r) => r.from !== u.id && r.to !== u.id);
+      delete next.pushSubs[u.id];
+      next.admins = next.admins.filter((a) => a !== u.id);
+      // 신고 기록은 처리 중일 수 있어 남기되, 사람을 알아볼 수 있는 정보는 지운다
+      Object.assign(t, { nickname: undefined, intro: '탈퇴한 사용자', tags: [], elementId: t.elementId, deletedAt: now, sharingLocation: false });
+      return { state: next, info: 'deleted' };
+    }
+    case 'acceptTerms': {
+      const u = s.users[cmd.actor] ?? fail('사용자를 찾을 수 없어요.');
+      if (cmd.version !== TERMS_VERSION) fail('약관이 바뀌었어요. 새로고침한 뒤 다시 동의해 주세요.');
+      u.consentVersion = TERMS_VERSION; u.consentAt = now; break;
+    }
+    case 'setPlace': {
+      const r = room(s, cmd.roomId);
+      if (r.hostId !== cmd.actor) fail('방장만 약속 장소를 정할 수 있어요.');
+      if (r.closedAt) fail('종료된 실험실이에요.');
+      if (!cmd.place) { r.place = null; sys(s, r.id, '방장이 약속 장소를 지웠어요.', now); break; }
+      const { lat, lng } = cmd.place; const label = (cmd.place.label ?? '').trim().replace(/\s+/g, ' ');
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) fail('지도에서 장소를 다시 찍어 주세요.');
+      if (label.length < 2 || label.length > 30) fail('장소 이름은 2~30자로 적어 주세요.');
+      if (distanceM({ lat, lng }, { lat: 37.611, lng: 126.9968 }) > 5000) fail('약속 장소는 학교에서 5km 안으로 정해 주세요.');
+      r.place = { lat, lng, label };
+      sys(s, r.id, `방장이 약속 장소를 '${label}'(으)로 정했어요. 실험실 화면에서 지도로 볼 수 있어요.`, now);
+      notifyRoom(s, r.id, `${roomTitle(r)}: 약속 장소가 '${label}'(으)로 정해졌어요.`, now, cmd.actor);
+      break;
+    }
+    case 'savePush': {
+      const u = s.users[cmd.actor] ?? fail('사용자를 찾을 수 없어요.');
+      const sub = cmd.sub;
+      if (!sub?.endpoint || !/^https:\/\//.test(sub.endpoint) || !sub.keys?.p256dh || !sub.keys?.auth) fail('알림 구독 정보가 올바르지 않아요.');
+      const list = (s.pushSubs[u.id] ?? []).filter((x) => x.endpoint !== sub.endpoint);
+      list.push({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, at: now });
+      s.pushSubs[u.id] = list.slice(-5); // 기기 5대까지
+      break;
+    }
+    case 'removePush': {
+      s.pushSubs[cmd.actor] = (s.pushSubs[cmd.actor] ?? []).filter((x) => x.endpoint !== cmd.endpoint);
+      break;
+    }
     case 'makeAdmin': {
       if (!s.users[cmd.userId]) fail('사용자를 찾을 수 없어요.');
       if (!s.admins.includes(cmd.userId)) s.admins.push(cmd.userId);
@@ -731,7 +803,7 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       break;
     }
   }
-  if (!['readNotifications', 'createUser', 'setLocation', 'updateProfile', 'claimCard', 'review'].includes(cmd.type)) drainQueue(s, now);
+  if (!['readNotifications', 'createUser', 'setLocation', 'updateProfile', 'claimCard', 'review', 'savePush', 'removePush', 'setPlace', 'acceptTerms', 'deleteAccount'].includes(cmd.type)) drainQueue(s, now);
   if (cmd.type === 'startAutoMatch' && info === 'queued') {
     const q = s.queue.find((x) => x.userId === cmd.actor && x.enteredAt === now);
     if (q?.status === 'matched') {
