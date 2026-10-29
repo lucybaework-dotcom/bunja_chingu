@@ -103,3 +103,15 @@ describe('알림 보내기', () => {
     expect(r.ok).toBe(true); expect(f.deleted).toEqual(['A']);
   });
 });
+
+test('닉네임 없이 만들어진 예전 기록은 한 번 채우고, 이후 닉네임을 바꿔도 그대로', async () => {
+  const { normalize, emptyState } = await import('./engine');
+  const s = emptyState();
+  s.users.a = { id: 'a', nickname: '에이' } as never; s.users.b = { id: 'b', nickname: '비' } as never;
+  s.meetings.push({ id: 'm1', attendees: [{ userId: 'a', element: 'H', intro: '' }, { userId: 'b', element: 'N', intro: '' }] } as never);
+  s.records.push({ id: 'r1', userId: 'a', meetingId: 'm1', companions: [{ element: 'N', intro: '' }] } as never);
+  const n = normalize(s);
+  expect(n.records[0].companions[0].nickname).toBe('비');
+  n.users.b.nickname = '바뀐닉';
+  expect(normalize(n).records[0].companions[0].nickname).toBe('비');
+});

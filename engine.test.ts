@@ -379,6 +379,7 @@ describe('10~12. 만남 확인과 카드', () => {
   });
   it('같은 분자 재획득은 대표 카드 하나 + 기록 누적', () => {
     const h = harness(); const a = h.user('H', '첫 소개');
+    h.run({ type: 'updateProfile', actor: a, nickname: '첫닉' });
     let rooms: string[] = [];
     for (let i = 0; i < 2; i++) {
       const b = h.user('H');
@@ -395,6 +396,11 @@ describe('10~12. 만남 확인과 카드', () => {
     const b0 = h.s.records.find((x) => x.userId !== a)!;
     h.run({ type: 'updateIntro', actor: a, intro: '바뀐 소개' });
     expect(h.s.records.find((x) => x.id === b0.id)!.companions[0].intro).toBe('첫 소개');
+    // 닉네임도 만난 때의 것으로 남고, 나중에 바꿔도 기록은 그대로
+    const nick0 = h.s.records.find((x) => x.id === b0.id)!.companions[0].nickname;
+    expect(nick0).toBe('첫닉');
+    h.run({ type: 'updateProfile', actor: a, nickname: '새닉네임' });
+    expect(h.s.records.find((x) => x.id === b0.id)!.companions[0].nickname).toBe(nick0);
     // 실험실 종료해도 카드 유지
     h.run({ type: 'closeRoom', actor: a, roomId: rooms[0] });
     expect(h.s.cards.filter((c) => c.userId === a).length).toBe(1);

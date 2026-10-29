@@ -51,7 +51,7 @@ export interface Proposal {
 
 export interface Message { id: Id; roomId: Id; senderId: Id | null; body: string; createdAt: number }
 
-export interface AttendeeSnap { userId: Id; element: ElementId; intro: string }
+export interface AttendeeSnap { userId: Id; element: ElementId; intro: string; nickname?: string }
 
 export interface GeoPoint { lat: number; lng: number; acc: number }
 export interface Meeting {
@@ -68,7 +68,7 @@ export type Visibility = 'private' | 'public';
 export interface CollectionCard { userId: Id; moleculeId: string; visibility: Visibility; firstEarnedAt: number }
 export interface MeetingRecord {
   id: Id; userId: Id; meetingId: Id; roomId: Id; moleculeId: string | null; targetMoleculeId: string;
-  companions: { element: ElementId; intro: string }[]; visibility: Visibility; createdAt: number;
+  companions: { element: ElementId; intro: string; nickname?: string }[]; visibility: Visibility; createdAt: number;
   /** "분자 카드 받기"를 누른 시각. 누르기 전에는 카드가 포장된 채로 기다린다 */
   claimedAt?: number | null;
 }

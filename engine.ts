@@ -80,6 +80,13 @@ export function normalize(s: State): State {
   for (const k of ['reviews', 'reports', 'blocks', 'admins'] as const) if (!Array.isArray(out[k])) (out as any)[k] = [];
   if (!out.locations) out.locations = {};
   if (!out.pushSubs) out.pushSubs = {};
+  // 닉네임을 남기기 전에 만들어진 기록: 한 번만 지금 닉네임으로 채운다 (이후에는 바뀌지 않음)
+  out.records = (out.records ?? []).map((rec) => {
+    if (rec.companions.every((c) => c.nickname)) return rec;
+    const others = out.meetings.find((m) => m.id === rec.meetingId)?.attendees.filter((a) => a.userId !== rec.userId);
+    if (!others || others.length !== rec.companions.length) return rec;
+    return { ...rec, companions: rec.companions.map((c, i) => c.nickname ? c : { ...c, nickname: others[i].nickname ?? out.users[others[i].userId]?.nickname }) };
+  });
   return out;
 }
 
@@ -301,7 +308,7 @@ function finalizeMeetingIfReady(s: State, meetingId: Id, now: number) {
   for (const a of mt.attendees) {
     if (!s.records.some((x) => x.userId === a.userId && x.meetingId === mt.id)) {
       s.records.push({ id: nid(s, 'rec'), userId: a.userId, meetingId: mt.id, roomId: r.id, moleculeId: mt.matchedMoleculeId,
-        targetMoleculeId: r.targetMoleculeId, companions: mt.attendees.filter((o) => o.userId !== a.userId).map((o) => ({ element: o.element, intro: o.intro })),
+        targetMoleculeId: r.targetMoleculeId, companions: mt.attendees.filter((o) => o.userId !== a.userId).map((o) => ({ element: o.element, intro: o.intro, nickname: s.users[o.userId]?.nickname ?? o.nickname })),
         visibility: 'private', createdAt: now });
     }
     if (mt.matchedMoleculeId && !s.cards.some((c) => c.userId === a.userId && c.moleculeId === mt.matchedMoleculeId)) {
@@ -578,7 +585,7 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       if (!ids.every((id) => act.some((m) => m.userId === id))) fail('실험실 구성원만 참석자로 고를 수 있어요.');
       const prevM = pendingMeeting(s, r.id);
       if (prevM) prevM.status = 'superseded'; // 수정하면 기존 확인은 모두 무효
-      const attendees = ids.map((id) => { const m = act.find((x) => x.userId === id)!; return { userId: id, element: m.elementSnapshot, intro: s.users[id].intro }; });
+      const attendees = ids.map((id) => { const m = act.find((x) => x.userId === id)!; return { userId: id, element: m.elementSnapshot, intro: s.users[id].intro, nickname: s.users[id].nickname }; });
       const match = exactMatches(countsOf(attendees.map((a) => a.element)))[0] ?? null; // 같은 조성이 여럿이면 카탈로그 첫 항목 (미정 사항)
       const id = nid(s, 'mt');
       s.meetings.push({ id, roomId: r.id, proposedBy: cmd.actor, attendees, confirmations: {}, status: 'pending',

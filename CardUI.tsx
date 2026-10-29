@@ -1,6 +1,7 @@
 // 분자 카드: 실제 카드 모양(앞/뒤 뒤집기), 도감, 넘겨 보기, 카드 받기 연출
 import { useEffect, useRef, useState } from 'react';
 import { ELEMENTS } from './elements';
+import { josaOf } from './josa';
 import { kindLabel, moleculeById, USABLE, type ElementId } from './molecules';
 import type { MeetingRecord } from './types';
 import { slotsOf } from './chemistry';
@@ -57,11 +58,11 @@ export function MolCard({ id, flipped = false, onFlip, records, live3d = true, t
                 {records.map((r) => (
                   <div key={r.id} className="tcard-rec">
                     <span className="small mono">{fmtDate(r.createdAt)}</span>
-                    <span className="row" style={{ gap: 4 }}>{r.companions.map((c, i) => <Atom key={i} el={c.element} size={20} />)}<span className="small">와 함께</span></span>
+                    <span className="row tcard-with">{r.companions.map((c, i) => { const n = c.nickname || ELEMENTS[c.element].name; const last = i === r.companions.length - 1; return <span key={i} className="row" style={{ gap: 4, flexWrap: 'nowrap' }}><Atom el={c.element} size={20} /><span className="small">{n}{last ? josaOf(n, '과/와') + ' 함께' : ','}</span></span>; })}</span>
                   </div>
                 ))}
               </div>
-              <p className="tcard-note">기록에는 만난 날의 원소와 한 줄 소개가 그대로 남아요.</p>
+              <p className="tcard-note">기록에는 만난 날의 원소와 닉네임이 그대로 남아요.</p>
             </div>
           ) : <CardBackPattern />}
         </div>

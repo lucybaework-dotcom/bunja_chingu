@@ -974,7 +974,7 @@ function RecordRow({ recId }: { recId: string }) {
     <div className="panel" style={{ gap: 8 }}>
       <div className="row between"><span className="small mono">{fmtDate(r.createdAt)}</span><span className="small muted">실험실 목표 {moleculeById(r.targetMoleculeId)!.formula}</span></div>
       <div className="stack-s">
-        {r.companions.map((c, i) => <div key={i} className="row small" style={{ flexWrap: 'nowrap' }}><Atom el={c.element} size={20} /><span className="grow">{c.intro}</span></div>)}
+        {r.companions.map((c, i) => <div key={i} className="row small" style={{ flexWrap: 'nowrap' }}><Atom el={c.element} size={20} />{c.nickname && <strong>{c.nickname}</strong>}<span className="grow muted">{c.intro}</span></div>)}
       </div>
       <div className="row between">
         <span className="small muted">이 기록 공개</span>

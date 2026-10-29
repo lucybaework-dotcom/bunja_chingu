@@ -329,3 +329,4 @@ details summary { cursor: pointer; }
 .mapbox.small-map { height: 170px; }
 .pin.place { animation-duration: .6s; }
 a.btn { text-decoration: none; color: inherit; display: inline-flex; align-items: center; }
+.tcard-with { gap: 6px 10px; flex-wrap: wrap; }
