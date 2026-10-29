@@ -1,9 +1,9 @@
 // 서버가 사용자 한 명에게 돌려주는 보기. 남의 채팅·알림·카드·리뷰·위치는 빼고, 볼 수 있는 프로필만 넣는다.
 import { isOnCampus } from './campus';
-import { buildProfile, canViewProfile, hostPins, type PublicProfile } from './engine';
+import { buildProfile, canViewProfile, elementStats, hostPins, type PublicProfile } from './engine';
 import type { State } from './types';
 
-export type View = State & { profiles: Record<string, PublicProfile>; isAdmin?: boolean };
+export type View = State & { profiles: Record<string, PublicProfile>; isAdmin?: boolean; stats?: ReturnType<typeof elementStats> };
 
 export function viewFor(s: State, uid: string, here?: { lat: number; lng: number } | null, now = Date.now()): View {
   const admin = s.admins.includes(uid);
@@ -25,6 +25,7 @@ export function viewFor(s: State, uid: string, here?: { lat: number; lng: number
       nickname: visible(id) || pinIds.has(id) ? u.nickname : undefined,
       tags: visible(id) ? u.tags : [],
       suspendedAt: id === uid || admin ? u.suspendedAt : null,
+      vacancyAlert: id === uid ? u.vacancyAlert : undefined, lastVacancyAlertAt: id === uid ? u.lastVacancyAlertAt : undefined,
     }])),
     queue: s.queue.map((q) => (q.userId === uid ? q : { ...q, userId: 'hidden' })),
     messages: s.messages.filter((m) => mine.has(m.roomId)),
@@ -42,5 +43,6 @@ export function viewFor(s: State, uid: string, here?: { lat: number; lng: number
     pushSubs: s.pushSubs[uid] ? { [uid]: s.pushSubs[uid].map((x) => ({ ...x, keys: { p256dh: '', auth: '' } })) } : {},
     profiles,
     isAdmin: admin,
+    stats: elementStats(s),
   };
 }

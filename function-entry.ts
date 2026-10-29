@@ -1,5 +1,5 @@
 // Supabase Edge Function 진입점 (Deno). 빌드하면 server-dist/bunja-function.js 한 파일이 된다.
-import { handle, type Deps } from './handler';
+import { handle, handleCron, type Deps } from './handler';
 import { b64u, sendWebPush, type VapidKeys } from './webpush';
 import type { State } from './types';
 
@@ -73,7 +73,9 @@ Deno.serve(async (req) => {
   try {
     const token = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') ?? null;
     const body = await req.json().catch(() => ({}));
-    const r = await handle(token, body, deps);
+    const r = body?.action === 'cron'
+      ? await handleCron(body.secret, { ...deps, cronSecret: Deno.env.get('CRON_SECRET') })
+      : await handle(token, body, deps);
     return new Response(JSON.stringify(r.body), { status: r.status, headers: { ...CORS, 'Content-Type': 'application/json' } });
   } catch (e) {
     console.error(e);

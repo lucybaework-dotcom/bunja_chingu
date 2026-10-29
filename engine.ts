@@ -3,7 +3,8 @@ import { j } from './josa';
 import { ELEMENTS } from './elements';
 import { moleculeById, USABLE, type ElementId } from './molecules';
 import { QUESTIONS, QUIZ_VERSION, scoreQuiz } from './quiz';
-import { contains, countsOf, exactMatches, hasVacancy, sameCounts, supersetCandidates, usableElements } from './chemistry';
+import { contains, countsOf, exactMatches, hasVacancy, sameCounts, supersetCandidates, usableElements, vacancies } from './chemistry';
+import { ACHIEVEMENTS, achievementById, isDone, type AchCtx } from './achievements';
 import { complementScore, matchReason, RECOMMEND_CONFIG } from './recommend';
 import { DomainError, type ChatPolicy, type GeoPoint, type Id, type Proposal, type ReportReason, type Room, type State, type Visibility } from './types';
 import { distanceM, isOnCampus } from './campus';
@@ -19,7 +20,9 @@ export type Command =
   | { type: 'claimCard'; actor: Id; recordId: Id }
   | { type: 'updateProfile'; actor: Id; nickname?: string; tags?: string[] }
   | { type: 'review'; actor: Id; meetingId: Id; to: Id; tags: string[] }
-  | { type: 'report'; actor: Id; target: Id; roomId?: Id | null; reason: ReportReason; detail: string }
+  | { type: 'report'; actor: Id; target: Id; roomId?: Id | null; reason: ReportReason; detail: string; messageId?: Id | null }
+  | { type: 'setVacancyAlert'; actor: Id; on: boolean }
+  | { type: 'setTitle'; actor: Id; title: string | null }
   | { type: 'block'; actor: Id; target: Id }
   | { type: 'unblock'; actor: Id; target: Id }
   | { type: 'setSharing'; actor: Id; on: boolean }
@@ -149,15 +152,61 @@ export function reactionOf(s: State, uid: Id): Reaction {
   return { score: got.length >= REACTION.minReviewsToShow ? Math.max(0, Math.min(100, raw)) : null, reviews: got.length, praise };
 }
 
+/** 업적 계산에 쓰는 값: 받은 카드, 만남 수, 만난 원소, 남긴 반응 수 */
+export function achCtx(s: State, uid: Id): AchCtx {
+  const recs = s.records.filter((r) => r.userId === uid);
+  const cards = [...new Set(recs.filter((r) => r.moleculeId && r.claimedAt).map((r) => r.moleculeId!))];
+  const metElements = new Set<ElementId>(recs.flatMap((r) => r.companions.map((c) => c.element)));
+  return { cards, meetings: recs.length, metElements, praisesGiven: s.reviews.filter((r) => r.from === uid).length };
+}
+export const earnedTitles = (s: State, uid: Id) => { const c = achCtx(s, uid); return ACHIEVEMENTS.filter((a) => isDone(a, c)).map((a) => a.id); };
+
+/** 학교 원소 분포: 원소를 확정한 (탈퇴하지 않은) 사람 수 */
+export function elementStats(s: State): { counts: Partial<Record<ElementId, number>>; total: number } {
+  const counts: Partial<Record<ElementId, number>> = {}; let total = 0;
+  for (const u of Object.values(s.users)) if (u.elementId && u.elementLockedAt && !u.deletedAt) { counts[u.elementId] = (counts[u.elementId] ?? 0) + 1; total++; }
+  return { counts, total };
+}
+
+export const VACANCY_ALERT_GAP_MS = 30 * 60_000;
+/** 모집 중인 실험실에 빈자리가 있으면, 알림을 켠 그 원소 사람에게 알린다 (30분에 한 번까지) */
+function alertVacancies(s: State, roomId: Id, actor: Id, now: number) {
+  const r = s.rooms[roomId]; if (!r || !isRecruitingOpen(r)) return;
+  const m = moleculeById(r.targetMoleculeId)!;
+  const vac = vacancies(m.atomCounts, roomCounts(s, roomId));
+  for (const u of Object.values(s.users)) {
+    if (!u.vacancyAlert || u.id === actor || u.virtual || u.deletedAt || u.suspendedAt || !u.elementId || !(vac[u.elementId] ?? 0)) continue;
+    if (isMember(s, roomId, u.id) || blockedWithRoom(s, u.id, roomId)) continue;
+    const c = recruitingCommitments(s, u.id); if (c.rooms.length || c.queued) continue;
+    if (u.lastVacancyAlertAt && now - u.lastVacancyAlertAt < VACANCY_ALERT_GAP_MS) continue;
+    u.lastVacancyAlertAt = now;
+    notify(s, u.id, `${j(ELEMENTS[u.elementId].name, '이/가')} 들어갈 자리가 생겼어요: ‘${roomTitle(r)}’ (${m.formula})`, roomId, now);
+  }
+}
+
+export const REMIND_BEFORE_MS = 10 * 60_000;
+/** 모이는 시각 10분 전 알림. 서버가 요청을 받을 때와 1분마다 실행한다 */
+export function remindMeetings(s: State, now: number): { state: State; changed: boolean } {
+  const due = Object.values(s.rooms).filter((r) => r.meetAt && !r.remindedAt && r.closedAt === null && r.meetAt - now <= REMIND_BEFORE_MS && r.meetAt > now - 60_000);
+  if (!due.length) return { state: s, changed: false };
+  const next = structuredClone(s);
+  for (const r0 of due) {
+    const r = next.rooms[r0.id]; r.remindedAt = now;
+    const mins = Math.max(0, Math.round((r.meetAt! - now) / 60_000));
+    notifyRoom(next, r.id, `‘${roomTitle(r)}’ 모임이 ${mins > 0 ? `${mins}분 뒤예요` : '곧 시작해요'}${r.place ? ` · ${r.place.label}` : ''}`, now);
+  }
+  return { state: next, changed: true };
+}
+
 export interface PublicProfile {
   id: Id; nickname: string; element: ElementId | null; intro: string; tags: string[];
-  reaction: Reaction; molecules: string[];
+  reaction: Reaction; molecules: string[]; title?: string | null;
 }
 export function buildProfile(s: State, uid: Id): PublicProfile {
   const u = s.users[uid];
   const claimed = new Set(s.records.filter((r) => r.userId === uid && r.moleculeId && r.claimedAt).map((r) => r.moleculeId!));
   return { id: uid, nickname: u?.nickname ?? '', element: u?.elementId ?? null, intro: u?.intro ?? '', tags: u?.tags ?? [],
-    reaction: reactionOf(s, uid), molecules: [...claimed] };
+    reaction: reactionOf(s, uid), molecules: [...claimed], title: u?.title ?? null };
 }
 /** 화면에서 쓰는 프로필 조회. 서버가 보낸 보기에는 볼 수 있는 프로필만 profiles에 들어 있다 */
 export function getProfile(s: State & { profiles?: Record<Id, PublicProfile> }, viewer: Id, uid: Id): PublicProfile | null {
@@ -646,7 +695,9 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       const r = room(s, cmd.roomId);
       if (r.hostId !== cmd.actor) fail('방장만 실험실 이름을 바꿀 수 있어요.');
       if (r.closedAt) fail('종료된 실험실이에요.');
+      const before = r.meetAt ?? null;
       r.name = cleanRoomName(cmd.name); r.meetAt = cleanMeetAt(cmd.meetAt, now);
+      if ((r.meetAt ?? null) !== before) r.remindedAt = null;
       sys(s, r.id, `방장이 실험실 이름을 '${r.name}'${r.meetAt ? '(으)로 정하고 모이는 시각을 적었어요.' : '(으)로 정했어요.'}`, now);
       break;
     }
@@ -684,8 +735,17 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       if (!REPORT_REASONS.some((r) => r.id === cmd.reason)) fail('신고 사유를 골라 주세요.');
       const detail = (cmd.detail ?? '').trim().slice(0, 300);
       if (cmd.reason === 'other' && !detail) fail('기타 사유는 내용을 적어 주세요.');
-      if (s.reports.some((r) => r.from === cmd.actor && r.target === cmd.target && r.status === 'open')) fail('이미 신고했어요. 관리자가 확인하고 있어요.');
-      s.reports.push({ id: nid(s, 'rp'), from: cmd.actor, target: cmd.target, roomId: cmd.roomId ?? null, reason: cmd.reason, detail, createdAt: now, status: 'open', resolvedAt: null });
+      let quote: string | undefined; let roomId = cmd.roomId ?? null;
+      if (cmd.messageId) {
+        const msg = s.messages.find((m) => m.id === cmd.messageId) ?? fail('메시지를 찾을 수 없어요.');
+        if (msg.senderId !== cmd.target) fail('그 사람이 보낸 메시지가 아니에요.');
+        if (!s.members.some((m) => m.roomId === msg.roomId && m.userId === cmd.actor)) fail('내가 있던 실험실의 메시지만 신고할 수 있어요.');
+        quote = msg.body.slice(0, 300); roomId = msg.roomId;
+      }
+      if (s.reports.some((r) => r.from === cmd.actor && r.target === cmd.target && r.status === 'open' && (r.messageId ?? null) === (cmd.messageId ?? null)))
+        fail(cmd.messageId ? '이미 신고한 메시지예요.' : '이미 신고했어요. 관리자가 확인하고 있어요.');
+      s.reports.push({ id: nid(s, 'rp'), from: cmd.actor, target: cmd.target, roomId, reason: cmd.reason, detail, createdAt: now, status: 'open', resolvedAt: null,
+        ...(cmd.messageId ? { messageId: cmd.messageId, quote } : {}) });
       notify(s, cmd.actor, '신고가 접수됐어요. 관리자가 확인할게요. 신고한 사실은 상대에게 알리지 않아요.', undefined, now);
       const reporters = new Set(s.reports.filter((r) => r.target === cmd.target && r.status !== 'dismissed').map((r) => r.from));
       const t = s.users[cmd.target];
@@ -805,12 +865,25 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       if (!s.admins.includes(cmd.userId)) s.admins.push(cmd.userId);
       break;
     }
+    case 'setVacancyAlert': {
+      const u = lockedUser(s, cmd.actor);
+      u.vacancyAlert = !!cmd.on; break;
+    }
+    case 'setTitle': {
+      const u = s.users[cmd.actor] ?? fail('사용자를 찾을 수 없어요.');
+      if (cmd.title === null) { u.title = null; break; }
+      const a = achievementById(cmd.title) ?? fail('없는 칭호예요.');
+      if (!isDone(a, achCtx(s, u.id))) fail('아직 얻지 못한 칭호예요.');
+      u.title = a.id; break;
+    }
     case 'readNotifications': {
       for (const n of s.notifications) if (n.userId === cmd.actor && !n.readAt) n.readAt = now;
       break;
     }
   }
-  if (!['readNotifications', 'createUser', 'setLocation', 'updateProfile', 'claimCard', 'review', 'savePush', 'removePush', 'setPlace', 'acceptTerms', 'deleteAccount'].includes(cmd.type)) drainQueue(s, now);
+  if (!['readNotifications', 'createUser', 'setLocation', 'updateProfile', 'claimCard', 'review', 'savePush', 'removePush', 'setPlace', 'acceptTerms', 'deleteAccount', 'setVacancyAlert', 'setTitle'].includes(cmd.type)) drainQueue(s, now);
+  if (cmd.type === 'createRoom' && createdId) alertVacancies(s, createdId, cmd.actor, now);
+  if (cmd.type === 'leaveRoom') alertVacancies(s, cmd.roomId, cmd.actor, now);
   if (cmd.type === 'startAutoMatch' && info === 'queued') {
     const q = s.queue.find((x) => x.userId === cmd.actor && x.enteredAt === now);
     if (q?.status === 'matched') {

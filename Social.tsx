@@ -7,6 +7,7 @@ import { getProfile, NICK_MAX, roomTitle, type Command } from './engine';
 import type { DispatchResult } from './backend';
 import type { ReportReason, State } from './types';
 import { Atom, Formula, fmtTime } from './bits';
+import { TitleChip } from './Extras2';
 
 type Run = (c: Command, ok?: string) => Promise<DispatchResult>;
 
@@ -71,6 +72,7 @@ export function ProfileSheet({ s, viewer, uid, run, onClose, roomId }: { s: Stat
             {p.element && <Atom el={p.element} size={56} />}
             <div className="stack-s grow">
               <h2>{p.nickname || '닉네임 없음'}</h2>
+              {p.title && <TitleChip id={p.title} />}
               <span className="small muted">{p.element ? `${ELEMENTS[p.element].name} (${p.element})` : ''}</span>
               <p className="small">“{p.intro}”</p>
             </div>
@@ -112,18 +114,19 @@ export function ProfileSheet({ s, viewer, uid, run, onClose, roomId }: { s: Stat
   );
 }
 
-function ReportForm({ run, viewer, target, roomId, name, onDone }: { run: Run; viewer: string; target: string; roomId?: string; name: string; onDone: () => void }) {
+export function ReportForm({ run, viewer, target, roomId, name, onDone, messageId, quote }: { run: Run; viewer: string; target: string; roomId?: string; name: string; onDone: () => void; messageId?: string; quote?: string }) {
   const [reason, setReason] = useState<ReportReason | ''>('');
   const [detail, setDetail] = useState('');
   const [alsoBlock, setAlsoBlock] = useState(true);
   return (
     <form className="stack" onSubmit={async (e) => {
       e.preventDefault(); if (!reason) return;
-      const r = await run({ type: 'report', actor: viewer, target, roomId: roomId ?? null, reason, detail }, '신고를 접수했어요.');
+      const r = await run({ type: 'report', actor: viewer, target, roomId: roomId ?? null, reason, detail, ...(messageId ? { messageId } : {}) }, '신고를 접수했어요.');
       if (r.ok && alsoBlock) await run({ type: 'block', actor: viewer, target });
       if (r.ok) onDone();
     }}>
-      <p className="small">{name}님을 신고하는 이유를 골라 주세요. 신고한 사실은 상대에게 알리지 않아요. 서로 다른 세 명에게 신고되면 관리자가 확인할 때까지 이용이 정지돼요.</p>
+      {quote !== undefined && <blockquote className="quote small">“{quote}”</blockquote>}
+      <p className="small">{quote !== undefined ? `${name}님의 이 메시지를` : `${name}님을`} 신고하는 이유를 골라 주세요. 신고한 메시지 내용은 관리자에게 함께 전달돼요. 신고한 사실은 상대에게 알리지 않아요. 서로 다른 세 명에게 신고되면 관리자가 확인할 때까지 이용이 정지돼요.</p>
       <div className="stack-s" role="radiogroup">
         {REPORT_REASONS.map((r) => (
           <label key={r.id} className="check" htmlFor={`rr-${r.id}`}><input id={`rr-${r.id}`} type="radio" name="reason" checked={reason === r.id} onChange={() => setReason(r.id)} /><span>{r.label}</span></label>
@@ -191,6 +194,7 @@ export function AdminView({ s, viewer, run }: { s: State; viewer: string; run: R
         <div key={r.id} className="panel" style={{ gap: 8 }}>
           <div className="row between"><strong>{nick(r.target)}</strong><span className="small muted mono">{fmtTime(r.createdAt)}</span></div>
           <span className="chip warn" style={{ alignSelf: 'flex-start' }}>{reason(r.reason)}</span>
+          {r.quote !== undefined && <blockquote className="quote small">신고된 메시지: “{r.quote}”</blockquote>}
           {r.detail && <p className="small">{r.detail}</p>}
           <span className="small muted">신고한 사람: {nick(r.from)}{r.roomId && s.rooms[r.roomId] ? ` · ${roomTitle(s.rooms[r.roomId])}` : ''}</span>
           {r.status === 'open' ? (

@@ -330,3 +330,31 @@ details summary { cursor: pointer; }
 .pin.place { animation-duration: .6s; }
 a.btn { text-decoration: none; color: inherit; display: inline-flex; align-items: center; }
 .tcard-with { gap: 6px 10px; flex-wrap: wrap; }
+
+/* 업적·분포·안내·채팅 고정 */
+.title-chip { border-color: #c9a24a; color: #8a6a1c; background: color-mix(in srgb, #f3d98b 25%, transparent); }
+.ach-grid { display: grid; gap: 8px; }
+.ach { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.ach.done { border-color: #c9a24a; background: color-mix(in srgb, #f3d98b 18%, var(--surface)); }
+.ach-badge { font-size: 22px; color: var(--ink-3, #999); width: 26px; text-align: center; }
+.ach.done .ach-badge { color: #c9a24a; }
+.ach-bar { display: block; height: 5px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 4px; }
+.ach-bar span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.stats { gap: 10px; }
+.stat-row { display: grid; grid-template-columns: 26px 64px 1fr auto; align-items: center; gap: 10px; }
+.stat-row.me .stat-name { font-weight: 700; }
+.stat-bar { height: 12px; border-radius: 6px; background: color-mix(in srgb, var(--line) 60%, transparent); overflow: hidden; }
+.stat-bar span { display: block; height: 100%; border-radius: 6px; border: 1px solid; min-width: 2px; transition: width .6s cubic-bezier(.3,1.2,.5,1); }
+.stat-n { min-width: 64px; text-align: right; }
+.guide { align-items: stretch; gap: 14px; text-align: center; }
+.guide-art { display: flex; justify-content: center; align-items: center; gap: 4px; min-height: 90px; animation: guide-in .45s cubic-bezier(.3,1.5,.5,1) both; }
+@keyframes guide-in { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
+.guide-dots { display: flex; justify-content: center; gap: 6px; }
+.guide-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.guide-dots span.on { background: var(--accent); width: 18px; border-radius: 4px; }
+.chat-pin { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.chat-pin a { color: var(--accent); }
+.msg .bubble.pickable { cursor: pointer; }
+.msg-report { align-self: flex-start; margin: -2px 0 4px 34px; }
+@media (prefers-reduced-motion: reduce) { .guide-art, .stat-bar span { animation: none; transition: none; } }
+.quote { margin: 0; padding: 8px 12px; border-left: 3px solid var(--bad); background: color-mix(in srgb, var(--bad) 7%, transparent); border-radius: 0 10px 10px 0; overflow-wrap: anywhere; }

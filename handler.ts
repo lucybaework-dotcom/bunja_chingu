@@ -1,5 +1,5 @@
 // 서버 규칙 실행기. 저장소·인증은 deps로 주입받아 로컬 테스트와 실제 Edge Function이 같은 코드를 쓴다.
-import { apply, emptyState, normalize, roomTitle, type Command } from './engine';
+import { apply, emptyState, normalize, remindMeetings, roomTitle, type Command } from './engine';
 import { ADMIN_EMAILS } from './socialData';
 import { DomainError, type PushSub, type State } from './types';
 import { viewFor } from './view';
@@ -45,6 +45,7 @@ const CLIENT_COMMANDS = new Set<Command['type']>([
   'setCardVisibility', 'setRecordVisibility', 'resolveConflict', 'readNotifications',
   'renameRoom', 'claimCard', 'updateProfile', 'review', 'report', 'block', 'unblock', 'setSharing', 'setLocation',
   'adminResolveReport', 'adminSetSuspended', 'deleteAccount', 'setPlace', 'savePush', 'removePush', 'acceptTerms',
+  'setVacancyAlert', 'setTitle',
 ]);
 
 export interface Reply { status: number; body: Record<string, unknown> }
@@ -73,6 +74,8 @@ export function sweep(s: State, now: number): { state: State; changed: boolean }
     if (state.proposals.some((p) => p.roomId === r.id && p.status === 'open')) continue;
     try { state = apply(state, { type: 'expireRecruitment', roomId: r.id }, now).state; changed = true; } catch { /* 무시 */ }
   }
+  const rem = remindMeetings(state, now);
+  if (rem.changed) { state = rem.state; changed = true; }
   return { state, changed };
 }
 
@@ -89,6 +92,22 @@ async function sendPushes(deps: Deps, before: State, after: State, actor: string
   let st = normalize(cur.state);
   for (const d of dead) st = apply(st, { type: 'removePush', actor: d.uid, endpoint: d.endpoint }, deps.now()).state;
   await deps.save(cur.version, st);
+}
+
+/** 1분마다 Supabase 예약 작업(pg_cron)이 부른다: 기한 처리와 10분 전 알림. 비밀값이 맞아야 한다 */
+export async function handleCron(secret: unknown, deps: Deps & { cronSecret?: string }): Promise<Reply> {
+  if (!deps.cronSecret || secret !== deps.cronSecret) return { status: 401, body: { error: 'unauthorized' } };
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const loaded = await deps.load(); if (!loaded) return { status: 200, body: { ok: true, changed: false } };
+    const base = normalize(loaded.state);
+    const { state, changed } = sweep(base, deps.now());
+    if (!changed) return { status: 200, body: { ok: true, changed: false } };
+    if (!(await deps.save(loaded.version, state))) continue;
+    await deps.bump();
+    if (deps.sendPush) await sendPushes(deps, base, state, '');
+    return { status: 200, body: { ok: true, changed: true } };
+  }
+  return { status: 409, body: { ok: false } };
 }
 
 export async function handle(token: string | null, body: unknown, deps: Deps): Promise<Reply> {

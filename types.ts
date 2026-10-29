@@ -17,6 +17,10 @@ export interface User {
   consentVersion?: string; consentAt?: number;
   /** 탈퇴한 시각. 탈퇴하면 개인 정보는 지우고 자리만 남긴다 */
   deletedAt?: number | null;
+  /** 내 원소 빈자리 알림을 켰는지, 마지막으로 보낸 시각 (너무 자주 보내지 않게) */
+  vacancyAlert?: boolean; lastVacancyAlertAt?: number;
+  /** 고른 칭호 (업적 id) */
+  title?: string | null;
 }
 
 export type ChatPolicy = 'immediate' | 'afterComplete';
@@ -34,6 +38,8 @@ export interface Room {
   meetAt?: number | null;
   /** 약속 장소 (방장이 지도에서 찍음) */
   place?: { lat: number; lng: number; label: string } | null;
+  /** 모이기 10분 전 알림을 보낸 시각 */
+  remindedAt?: number | null;
 }
 
 export interface RoomMember {
@@ -78,6 +84,8 @@ export type ReportReason = 'rude' | 'noshow' | 'spam' | 'inappropriate' | 'other
 export interface Report {
   id: Id; from: Id; target: Id; roomId: Id | null; reason: ReportReason; detail: string; createdAt: number;
   status: 'open' | 'upheld' | 'dismissed'; resolvedAt: number | null;
+  /** 메시지 하나를 골라 신고했으면 그 메시지와 신고 당시 내용 */
+  messageId?: Id | null; quote?: string;
 }
 export interface Block { from: Id; to: Id; createdAt: number }
 export interface LastLocation { lat: number; lng: number; acc: number; at: number }

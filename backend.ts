@@ -2,7 +2,7 @@
 // LocalBackend: 이 기기의 브라우저 저장소 + 가상 사용자로 흐름을 시연한다 (다중 사용자 서비스가 아님).
 // RemoteBackend: 같은 Command를 Supabase Edge Function에 보내고, 서버가 같은 규칙(engine.apply)을
 // 저장소 버전 확인과 함께 실행한다. 화면은 서버가 돌려준 "내 보기"만 그린다.
-import { apply, normalize, type Command } from './engine';
+import { apply, normalize, remindMeetings, type Command } from './engine';
 import { DomainError, type State } from './types';
 import { seedState } from './seed';
 
@@ -26,6 +26,12 @@ export class LocalBackend implements Backend {
   constructor(private clock: () => number = () => Date.now()) {
     this.state = this.load() ?? seedState(this.clock());
     this.freshenVirtual();
+    // 시연판에는 서버가 없으니 이 기기에서 30초마다 '10분 전 알림'을 확인한다
+    if (typeof window !== 'undefined') setInterval(() => this.tick(), 30_000);
+  }
+  private tick() {
+    const r = remindMeetings(this.state, this.clock());
+    if (r.changed) { this.state = r.state; this.save(); this.subs.forEach((f) => f()); }
   }
   /** 시연용 가상 방장은 움직이지 않으니 위치 시각만 지금으로 맞춰 지도에 계속 보이게 한다 */
   private freshenVirtual() {
@@ -39,6 +45,7 @@ export class LocalBackend implements Backend {
   getState() { return this.state; }
   async dispatch(cmd: Command): Promise<DispatchResult> {
     try {
+      this.state = remindMeetings(this.state, this.clock()).state;
       const r = apply(this.state, cmd, this.clock());
       this.state = r.state; this.freshenVirtual(); this.save(); this.subs.forEach((f) => f());
       return { ok: true, createdId: r.createdId, info: r.info };
