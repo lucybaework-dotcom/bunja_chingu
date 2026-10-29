@@ -280,7 +280,7 @@ details summary { cursor: pointer; }
 .dex-fit { font-size: 10px; font-weight: 700; color: var(--accent); }
 
 /* ───── 넘겨 보기 ───── */
-.carousel { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 18px 9%; margin: 0 -16px; scrollbar-width: none; }
+.carousel { position: relative; display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 18px 9%; margin: 0 -16px; scrollbar-width: none; }
 .carousel::-webkit-scrollbar { display: none; }
 .carousel-slot { flex: 0 0 82%; scroll-snap-align: center; transition: transform .3s, opacity .3s; transform: scale(.92); opacity: .6; }
 .carousel-slot.cur { transform: none; opacity: 1; }

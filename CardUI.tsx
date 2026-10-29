@@ -110,23 +110,32 @@ export function CardCarousel({ ids, start, recordsOf, onIndex }: { ids: string[]
   const ref = useRef<HTMLDivElement>(null);
   const [flip, setFlip] = useState<Record<string, boolean>>({});
   const [cur, setCur] = useState(Math.max(0, ids.indexOf(start)));
+  // 카드 i를 가운데에 두려면 얼마나 스크롤해야 하는지 (화면 좌표로 계산해서 레이아웃과 무관하게)
+  const leftFor = (el: HTMLDivElement, i: number) => {
+    const k = el.children[i] as HTMLElement | undefined; if (!k) return 0;
+    const box = el.getBoundingClientRect(), kb = k.getBoundingClientRect();
+    return el.scrollLeft + (kb.left - box.left) - (box.width - kb.width) / 2;
+  };
+  const target = useRef<number | null>(null);
   useEffect(() => {
     const el = ref.current; if (!el) return;
-    const i = Math.max(0, ids.indexOf(start));
-    el.scrollTo({ left: i * el.clientWidth * 0.82, behavior: 'auto' });
+    el.scrollTo({ left: leftFor(el, Math.max(0, ids.indexOf(start))), behavior: 'auto' });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const onScroll = () => {
     const el = ref.current; if (!el) return;
-    const kids = [...el.children] as HTMLElement[];
-    const mid = el.scrollLeft + el.clientWidth / 2;
+    const box = el.getBoundingClientRect(); const mid = box.left + box.width / 2;
     let best = 0, bd = Infinity;
-    kids.forEach((k, i) => { const d = Math.abs(k.offsetLeft + k.offsetWidth / 2 - mid); if (d < bd) { bd = d; best = i; } });
+    [...el.children].forEach((k, i) => { const r = k.getBoundingClientRect(); const d = Math.abs(r.left + r.width / 2 - mid); if (d < bd) { bd = d; best = i; } });
+    // 버튼으로 넘기는 중에는 도착할 때까지 목표 카드를 유지한다
+    if (target.current !== null) { if (best !== target.current) return; target.current = null; }
     if (best !== cur) { setCur(best); onIndex?.(ids[best]); }
   };
   const go = (d: number) => {
     const el = ref.current; if (!el) return;
-    const k = el.children[Math.min(ids.length - 1, Math.max(0, cur + d))] as HTMLElement;
-    el.scrollTo({ left: k.offsetLeft - (el.clientWidth - k.offsetWidth) / 2, behavior: 'smooth' });
+    const i = Math.min(ids.length - 1, Math.max(0, (target.current ?? cur) + d));
+    target.current = i; setCur(i); onIndex?.(ids[i]);
+    el.scrollTo({ left: leftFor(el, i), behavior: 'smooth' });
+    window.setTimeout(() => { if (target.current === i) target.current = null; }, 900);
   };
   return (
     <div className="stack-s">
