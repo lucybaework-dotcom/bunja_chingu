@@ -44,5 +44,6 @@ export function viewFor(s: State, uid: string, here?: { lat: number; lng: number
     profiles,
     isAdmin: admin,
     stats: elementStats(s),
+    aiUsage: s.aiUsage?.[uid] ? { [uid]: s.aiUsage[uid] } : {},
   };
 }

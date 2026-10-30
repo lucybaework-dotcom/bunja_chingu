@@ -22,6 +22,7 @@ export type Command =
   | { type: 'review'; actor: Id; meetingId: Id; to: Id; tags: string[] }
   | { type: 'report'; actor: Id; target: Id; roomId?: Id | null; reason: ReportReason; detail: string; messageId?: Id | null }
   | { type: 'setVacancyAlert'; actor: Id; on: boolean }
+  | { type: 'recordAdvice'; actor: Id; ranking: { element: ElementId; reason: string }[] }
   | { type: 'setTitle'; actor: Id; title: string | null }
   | { type: 'block'; actor: Id; target: Id }
   | { type: 'unblock'; actor: Id; target: Id }
@@ -54,7 +55,7 @@ export type Command =
 
 export const INTRO_MAX = 40;
 /** 지금 약관 버전. 바꾸면 기존 사용자에게 다시 동의를 받는다 */
-export const TERMS_VERSION = '2026-10-29';
+export const TERMS_VERSION = '2026-10-30';
 export const DELETE_WORD = '탈퇴';
 export const NICK_MIN = 2, NICK_MAX = 10, ROOM_NAME_MIN = 2, ROOM_NAME_MAX = 30;
 /** 방장 위치가 이보다 오래되면 지도에서 숨긴다 */
@@ -473,6 +474,17 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       s.quizAttempts.push({ id, userId: u.id, version: QUIZ_VERSION, answers: cmd.answers, recommended: r.recommended, createdAt: now });
       createdId = id; break;
     }
+    case 'recordAdvice': {
+      const u = s.users[cmd.actor] ?? fail('사용자를 찾을 수 없어요.');
+      if (u.elementLockedAt) fail('원소를 확정한 뒤에는 상담을 다시 받을 수 없어요.');
+      const ok = usableElements();
+      const picks = cmd.ranking.filter((p, i, a) => ok.includes(p.element) && a.findIndex((x) => x.element === p.element) === i).slice(0, 3);
+      if (!picks.length) fail('추천 결과가 비어 있어요.');
+      const id = nid(s, 'qa');
+      s.quizAttempts.push({ id, userId: u.id, version: 'ai-1', answers: {}, recommended: picks[0].element, createdAt: now,
+        aiRanking: picks.map((p) => p.element), aiReasons: Object.fromEntries(picks.map((p) => [p.element, p.reason.slice(0, 200)])) });
+      createdId = id; break;
+    }
     case 'lockElement': {
       const u = s.users[cmd.actor] ?? fail('사용자를 찾을 수 없어요.');
       if (u.elementLockedAt) fail('원소는 한 번 확정하면 바꿀 수 없어요. 바꾸려면 탈퇴 후 다시 가입해야 해요.');
@@ -823,6 +835,7 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       next.blocks = next.blocks.filter((b) => b.from !== u.id && b.to !== u.id);
       next.reviews = next.reviews.filter((r) => r.from !== u.id && r.to !== u.id);
       delete next.pushSubs[u.id];
+      if (next.aiUsage) delete next.aiUsage[u.id];
       next.admins = next.admins.filter((a) => a !== u.id);
       // 신고 기록은 처리 중일 수 있어 남기되, 사람을 알아볼 수 있는 정보는 지운다
       Object.assign(t, { nickname: undefined, intro: '탈퇴한 사용자', tags: [], elementId: t.elementId, deletedAt: now, sharingLocation: false });
@@ -881,7 +894,7 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       break;
     }
   }
-  if (!['readNotifications', 'createUser', 'setLocation', 'updateProfile', 'claimCard', 'review', 'savePush', 'removePush', 'setPlace', 'acceptTerms', 'deleteAccount', 'setVacancyAlert', 'setTitle'].includes(cmd.type)) drainQueue(s, now);
+  if (!['readNotifications', 'createUser', 'setLocation', 'updateProfile', 'claimCard', 'review', 'savePush', 'removePush', 'setPlace', 'acceptTerms', 'deleteAccount', 'setVacancyAlert', 'setTitle', 'recordAdvice'].includes(cmd.type)) drainQueue(s, now);
   if (cmd.type === 'createRoom' && createdId) alertVacancies(s, createdId, cmd.actor, now);
   if (cmd.type === 'leaveRoom') alertVacancies(s, cmd.roomId, cmd.actor, now);
   if (cmd.type === 'startAutoMatch' && info === 'queued') {

@@ -3,6 +3,7 @@ import { ConsentChecks, DeleteAccount, DocSheet, InstallCard, PlaceCard, PushTog
 import { j, josaOf } from './josa';
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ELEMENTS, METAPHOR_NOTICE, pairContent } from './elements';
+import { AI_LIMITS, type AiReply, type AiTurn } from './advisor';
 import { kindLabel, moleculeById, type ElementId } from './molecules';
 import { CONTEXT_LABEL, QUESTIONS, scoreQuiz } from './quiz';
 import type { Backend, DispatchResult } from './backend';
@@ -254,9 +255,98 @@ function Intro({ onStart }: { onStart: () => void }) {
 function Onboarding() {
   const { s, viewer, run } = useApp();
   const attempts = s.quizAttempts.filter((a) => a.userId === viewer);
-  const [phase, setPhase] = useState<'quiz' | 'choose'>(attempts.length ? 'choose' : 'quiz');
+  const [phase, setPhase] = useState<'pick' | 'quiz' | 'ai' | 'choose'>(attempts.length ? 'choose' : 'pick');
+  if (phase === 'pick') return <FindWay onAi={() => setPhase('ai')} onQuiz={() => setPhase('quiz')} onBack={attempts.length ? () => setPhase('choose') : undefined} />;
+  if (phase === 'ai') return <AiAdvisor onDone={() => setPhase('choose')} onQuiz={() => setPhase('quiz')} />;
   if (phase === 'quiz') return <Quiz onDone={async (answers) => { const r = await run({ type: 'recordQuiz', actor: viewer, answers }); if (r.ok) setPhase('choose'); }} onSkip={attempts.length ? () => setPhase('choose') : undefined} />;
-  return <Choose onRetake={() => setPhase('quiz')} />;
+  return <Choose onRetake={() => setPhase('pick')} />;
+}
+
+function FindWay({ onAi, onQuiz, onBack }: { onAi: () => void; onQuiz: () => void; onBack?: () => void }) {
+  const { backend } = useApp();
+  return (
+    <div className="stack" style={{ gap: 16 }}>
+      {onBack && <button className="back" onClick={onBack}>← 결과로 돌아가기</button>}
+      <div className="stack-s"><span className="eyebrow">나의 원소 찾기</span><h1>어떻게 찾아볼까요?</h1>
+        <p className="small muted">어느 쪽이든 추천은 참고일 뿐이고, 마지막엔 원소 설명을 비교해서 직접 골라요.</p></div>
+      <button className="option way" onClick={onAi}>
+        <span className="row" style={{ flexWrap: 'nowrap', gap: 12 }}><span className="way-ic" aria-hidden="true">💬</span>
+          <span className="stack-s grow" style={{ gap: 2 }}><strong>AI와 대화하며 찾기 <span className="chip on">추천</span></strong>
+            <span className="small muted">AI 상담사가 4~5개를 물어보고, 내 답을 근거로 어울리는 원소 3개를 골라 줘요. 3분쯤 걸려요.</span></span></span>
+      </button>
+      <button className="option way" onClick={onQuiz}>
+        <span className="row" style={{ flexWrap: 'nowrap', gap: 12 }}><span className="way-ic" aria-hidden="true">📝</span>
+          <span className="stack-s grow" style={{ gap: 2 }}><strong>질문 {QUESTIONS.length}개 고르기</strong>
+            <span className="small muted">보기 중에 고르기만 하면 돼요. 1분이면 끝나요.</span></span></span>
+      </button>
+      <p className="small muted">{backend.mode === 'demo' ? '시연판의 AI 상담은 실제 AI 대신 정해진 질문과 규칙으로 흉내만 내요.' : 'AI 상담 대화는 추천을 만들기 위해 Google Gemini로 보내지고, 분자친구 서버에는 저장하지 않아요. 이름·연락처 같은 개인 정보는 적지 마세요.'}</p>
+    </div>
+  );
+}
+
+function AiAdvisor({ onDone, onQuiz }: { onDone: () => void; onQuiz: () => void }) {
+  const { backend } = useApp();
+  const [turns, setTurns] = useState<AiTurn[]>([]);
+  const [txt, setTxt] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [result, setResult] = useState<AiReply | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const answers = turns.filter((t) => t.role === 'user').length;
+  const ask = async (hist: AiTurn[], finish = false) => {
+    setBusy(true); setErr('');
+    const r = await backend.ai(hist, finish);
+    setBusy(false);
+    if (!r.ok) { setErr(r.error); return false; }
+    setTurns([...hist, { role: 'ai', text: r.reply.reply }]);
+    if (r.reply.done) setResult(r.reply);
+    return true;
+  };
+  useEffect(() => { void ask([]); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { ref.current?.scrollTo({ top: ref.current.scrollHeight, behavior: 'smooth' }); }, [turns.length, busy, result]);
+  const send = async () => {
+    const t = txt.trim(); if (!t || busy) return;
+    const hist = [...turns, { role: 'user' as const, text: t }];
+    setTurns(hist); setTxt('');
+    if (!(await ask(hist))) { setTurns(turns); setTxt(t); }
+  };
+  return (
+    <div className="stack ai-page" style={{ gap: 12 }}>
+      <div className="row between"><div className="stack-s" style={{ gap: 0 }}><span className="eyebrow">AI 원소 상담</span><h2>나와 닮은 원소 찾기</h2></div>
+        <button className="btn sm ghost" onClick={onQuiz}>질문으로 할래요</button></div>
+      <div className="chat ai-chat" ref={ref} aria-live="polite">
+        {turns.map((t, i) => (
+          <div key={i} className={`msg${t.role === 'user' ? ' mine' : ''}`}>
+            {t.role === 'ai' && <span className="ai-av" aria-hidden="true">AI</span>}
+            <div className="bubble">{t.text}</div>
+          </div>
+        ))}
+        {busy && <div className="msg"><span className="ai-av" aria-hidden="true">AI</span><div className="bubble typing" aria-label="AI가 답을 쓰는 중"><span /><span /><span /></div></div>}
+        {result && (
+          <div className="panel ai-result">
+            <span className="eyebrow">추천 원소</span>
+            {result.ranking.map((p, i) => (
+              <div key={p.element} className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start', gap: 10 }}>
+                <Atom el={p.element} size={i === 0 ? 40 : 32} />
+                <span className="stack-s grow" style={{ gap: 2 }}><strong>{i + 1}. {ELEMENTS[p.element].name}</strong><span className="small">{p.reason}</span></span>
+              </div>
+            ))}
+            <button className="btn primary block" onClick={onDone}>원소 비교하고 고르기</button>
+          </div>
+        )}
+      </div>
+      {err && <div className="panel warn"><p className="small">{err}</p><div className="row"><button className="btn sm" onClick={() => void (turns.length ? send() : ask([]))}>다시 시도</button><button className="btn sm ghost" onClick={onQuiz}>질문으로 찾기</button></div></div>}
+      {!result && (
+        <>
+          <form className="composer" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+            <input className="input" value={txt} onChange={(e) => setTxt(e.target.value)} maxLength={AI_LIMITS.maxChars} placeholder={busy ? 'AI가 답하는 중…' : '자유롭게 답해 주세요'} aria-label="AI에게 답하기" disabled={busy || !turns.length} />
+            <button className="btn primary" disabled={busy || !txt.trim()}>보내기</button>
+          </form>
+          {answers >= AI_LIMITS.minAnswersToFinish && <button className="btn ghost block" disabled={busy} onClick={() => void ask(turns, true)}>이 정도면 됐어요, 결과 볼래요</button>}
+        </>
+      )}
+    </div>
+  );
 }
 
 function Quiz({ onDone, onSkip }: { onDone: (a: Record<string, number>) => void; onSkip?: () => void }) {
@@ -317,7 +407,8 @@ function ElementDetail({ el }: { el: ElementId }) {
 function Choose({ onRetake }: { onRetake: () => void }) {
   const { s, viewer, run, go } = useApp();
   const last = s.quizAttempts.filter((a) => a.userId === viewer).at(-1)!;
-  const ranking = useMemo(() => scoreQuiz(last.answers, usableElements()).ranking, [last]);
+  const isAi = !!last.aiRanking?.length;
+  const ranking = useMemo(() => isAi ? [...last.aiRanking!, ...usableElements().filter((e) => !last.aiRanking!.includes(e))] : scoreQuiz(last.answers, usableElements()).ranking, [last, isAi]);
   const [sel, setSel] = useState<ElementId>(last.recommended);
   const [confirming, setConfirming] = useState(false);
   const [ack, setAck] = useState(false);
@@ -335,22 +426,23 @@ function Choose({ onRetake }: { onRetake: () => void }) {
   return (
     <div className="stack" style={{ gap: 18 }}>
       <div className="stack-s">
-        <span className="eyebrow">테스트 결과</span>
+        <span className="eyebrow">{isAi ? 'AI 상담 결과' : '테스트 결과'}</span>
         <h1>추천 원소는 {j(ELEMENTS[last.recommended].name, '이에요/예요')}</h1>
         <p className="muted small">다른 원소 설명도 비교해 보고 직접 골라 주세요. 추천과 달라도 괜찮아요.</p>
       </div>
       <div className="el-tabs" role="tablist">
         {ranking.map((el) => (
           <button key={el} role="tab" aria-selected={sel === el} className={`el-tab${sel === el ? ' sel' : ''}`} onClick={() => { setSel(el); setConfirming(false); }}>
-            <Atom el={el} size={34} /><span>{ELEMENTS[el].name}</span>{el === last.recommended && <span className="rec">추천</span>}
+            <Atom el={el} size={34} /><span>{ELEMENTS[el].name}</span>{el === last.recommended ? <span className="rec">추천</span> : isAi && last.aiRanking!.includes(el) ? <span className="rec alt">{last.aiRanking!.indexOf(el) + 1}위</span> : null}
           </button>
         ))}
       </div>
+      {isAi && last.aiReasons?.[sel] && <div className="panel ai-reason"><span className="eyebrow">AI가 본 이유</span><p className="small">{last.aiReasons[sel]}</p></div>}
       <div className="panel"><ElementDetail el={sel} /></div>
       {!confirming ? (
         <div className="stack-s">
           <button className="btn primary block" onClick={() => setConfirming(true)}>{j(ELEMENTS[sel].name, '으로/로')} 할게요</button>
-          <button className="btn ghost block" onClick={onRetake}>테스트 다시 보기</button>
+          <button className="btn ghost block" onClick={onRetake}>다른 방법으로 다시 찾기</button>
         </div>
       ) : (
         <div className="panel warn">

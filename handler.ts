@@ -3,6 +3,7 @@ import { apply, emptyState, normalize, remindMeetings, roomTitle, type Command }
 import { ADMIN_EMAILS } from './socialData';
 import { DomainError, type PushSub, type State } from './types';
 import { viewFor } from './view';
+import { AI_LIMITS, cleanHistory, type AiReply, type AiTurn } from './advisor';
 
 export interface Deps {
   getUser(token: string): Promise<{ id: string; email: string } | null>;
@@ -15,6 +16,8 @@ export interface Deps {
   sendPush?(sub: PushSub, data: PushData): Promise<number>;
   /** 탈퇴한 사람의 로그인 계정 지우기 */
   deleteAuthUser?(uid: string): Promise<void>;
+  /** AI 원소 상담 (없으면 꺼짐) */
+  ai?(history: AiTurn[], finish: boolean): Promise<AiReply>;
 }
 
 export interface PushData { title: string; body: string; url: string; tag: string }
@@ -94,6 +97,32 @@ async function sendPushes(deps: Deps, before: State, after: State, actor: string
   await deps.save(cur.version, st);
 }
 
+const kstDay = (t: number) => new Date(t + 9 * 3_600_000).toISOString().slice(0, 10);
+
+/** AI 상담 한 번: 하루 횟수 확인 → 모델 호출 → 끝났으면 추천을 기록 */
+async function runAi(uid: string, b: { history?: unknown; finish?: unknown }, s: State, now: number, deps: Deps, cached?: AiReply):
+  Promise<{ state: State; reply: AiReply } | { error: string; status: number }> {
+  if (!deps.ai) return { error: 'AI 상담이 아직 준비되지 않았어요. 질문 테스트로 찾아 주세요.', status: 503 };
+  const u = s.users[uid];
+  if (!u) return { error: '먼저 가입을 마쳐 주세요.', status: 400 };
+  if (u.elementLockedAt) return { error: '원소를 확정한 뒤에는 상담을 다시 받을 수 없어요.', status: 400 };
+  const history = cleanHistory(b.history);
+  if (!history) return { error: '대화가 너무 길어요. 처음부터 다시 시작해 주세요.', status: 400 };
+  const day = kstDay(now); const used = s.aiUsage?.[uid];
+  const n = used?.day === day ? used.n : 0;
+  if (n >= AI_LIMITS.perDay) return { error: '오늘 AI 상담 횟수를 다 썼어요. 내일 다시 하거나 질문 테스트로 찾아 주세요.', status: 429 };
+  const answers = history.filter((t) => t.role === 'user').length;
+  let reply: AiReply;
+  try { reply = cached ?? await deps.ai(history, b.finish === true || answers >= AI_LIMITS.forceFinishAfter); }
+  catch (e) {
+    console.error('ai', e);
+    return { error: (e as { status?: number }).status === 429 ? 'AI가 지금 바빠요. 잠시 후 다시 보내 주세요.' : 'AI가 답하지 못했어요. 다시 보내 주세요.', status: 502 };
+  }
+  let next: State = { ...s, aiUsage: { ...(s.aiUsage ?? {}), [uid]: { day, n: n + 1 } } };
+  if (reply.done) next = apply(next, { type: 'recordAdvice', actor: uid, ranking: reply.ranking }, now).state;
+  return { state: next, reply };
+}
+
 /** 1분마다 Supabase 예약 작업(pg_cron)이 부른다: 기한 처리와 10분 전 알림. 비밀값이 맞아야 한다 */
 export async function handleCron(secret: unknown, deps: Deps & { cronSecret?: string }): Promise<Reply> {
   if (!deps.cronSecret || secret !== deps.cronSecret) return { status: 401, body: { error: 'unauthorized' } };
@@ -119,6 +148,7 @@ export async function handle(token: string | null, body: unknown, deps: Deps): P
   const here = b.here && typeof b.here.lat === 'number' && typeof b.here.lng === 'number' ? { lat: b.here.lat, lng: b.here.lng } : null;
   const isAdminEmail = ADMIN_EMAILS.includes(user.email.toLowerCase());
 
+  let aiCache: AiReply | undefined;
   for (let attempt = 0; attempt < 6; attempt++) {
     const loaded = await deps.load();
     const now = deps.now();
@@ -137,6 +167,11 @@ export async function handle(token: string | null, body: unknown, deps: Deps): P
       } catch (e) {
         out = { ok: false, error: e instanceof DomainError ? e.message : '요청을 처리하지 못했어요. 다시 시도해 주세요.' };
       }
+    } else if (b.action === 'ai') {
+      const r = await runAi(user.id, b as { history?: unknown; finish?: unknown }, next, now, deps, aiCache);
+      if ('reply' in r) aiCache = r.reply; // 저장이 겹쳐 다시 돌 때 AI를 또 부르지 않게
+      if ('error' in r) return { status: r.status, body: { error: r.error, view: viewFor(next, user.id, here, now) } };
+      next = r.state; changed = true; out = { ok: true, ai: r.reply };
     } else if (b.action !== 'view') {
       return { status: 400, body: { error: '알 수 없는 요청이에요.' } };
     }

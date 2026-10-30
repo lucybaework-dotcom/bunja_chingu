@@ -5,6 +5,9 @@
 import { apply, normalize, remindMeetings, type Command } from './engine';
 import { DomainError, type State } from './types';
 import { seedState } from './seed';
+import { demoAdvisor, type AiReply, type AiTurn } from './advisor';
+
+export type AiResult = { ok: true; reply: AiReply } | { ok: false; error: string };
 
 export interface DispatchResult { ok: boolean; error?: string; createdId?: string; info?: string }
 
@@ -15,6 +18,8 @@ export interface Backend {
   subscribe(fn: () => void): () => void;
   reset(): void;
   signOut?(): Promise<void>;
+  /** AI 원소 상담 한 번 주고받기 */
+  ai(history: AiTurn[], finish: boolean): Promise<AiResult>;
 }
 
 const KEY = 'bunja-chingu-demo-v1';
@@ -53,6 +58,13 @@ export class LocalBackend implements Backend {
       if (e instanceof DomainError) return { ok: false, error: e.message };
       throw e;
     }
+  }
+  /** 시연판: 서버와 AI 없이 정해진 질문으로 상담을 흉내 낸다 */
+  async ai(history: AiTurn[], finish: boolean): Promise<AiResult> {
+    await new Promise((r) => setTimeout(r, 500));
+    const reply = demoAdvisor(history, finish);
+    if (reply.done && this.state.meId) { const r = await this.dispatch({ type: 'recordAdvice', actor: this.state.meId, ranking: reply.ranking }); if (!r.ok) return { ok: false, error: r.error! }; }
+    return { ok: true, reply };
   }
   subscribe(fn: () => void) { this.subs.add(fn); return () => { this.subs.delete(fn); }; }
   reset() { this.state = seedState(this.clock()); this.freshenVirtual(); this.save(); this.subs.forEach((f) => f()); }
@@ -101,6 +113,14 @@ export class RemoteBackend implements Backend {
     } catch {
       return { ok: false, error: '인터넷 연결을 확인하고 다시 시도해 주세요.' };
     }
+  }
+  async ai(history: AiTurn[], finish: boolean): Promise<AiResult> {
+    try {
+      const r = await this.t.call({ action: 'ai', history, finish });
+      if (r.json.view) this.set(r.json.view as State);
+      if (r.status !== 200 || !r.json.ai) return { ok: false, error: String(r.json.error ?? 'AI가 답하지 못했어요.') };
+      return { ok: true, reply: r.json.ai as AiReply };
+    } catch { return { ok: false, error: '인터넷 연결을 확인하고 다시 시도해 주세요.' }; }
   }
   subscribe(fn: () => void) { this.subs.add(fn); return () => { this.subs.delete(fn); }; }
   reset() {}

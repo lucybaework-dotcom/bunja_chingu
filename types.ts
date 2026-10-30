@@ -94,7 +94,11 @@ export interface PushSub { endpoint: string; keys: { p256dh: string; auth: strin
 
 export interface Notification { id: Id; userId: Id; text: string; roomId?: Id; createdAt: number; readAt: number | null }
 
-export interface QuizAttempt { id: Id; userId: Id; version: string; answers: Record<string, number>; recommended: ElementId; createdAt: number }
+export interface QuizAttempt {
+  id: Id; userId: Id; version: string; answers: Record<string, number>; recommended: ElementId; createdAt: number;
+  /** AI 상담으로 받은 추천 (순서대로)과 이유 */
+  aiRanking?: ElementId[]; aiReasons?: Partial<Record<ElementId, string>>;
+}
 
 export interface Config {
   /** 모집 기한 (미정 사항 → 설정값) */
@@ -113,6 +117,8 @@ export interface State {
   proposals: Proposal[]; messages: Message[]; meetings: Meeting[];
   cards: CollectionCard[]; records: MeetingRecord[]; notifications: Notification[]; quizAttempts: QuizAttempt[];
   reviews: Review[]; reports: Report[]; blocks: Block[];
+  /** AI 상담 하루 사용 횟수 */
+  aiUsage?: Record<Id, { day: string; n: number }>;
   /** 방장 위치: 사용자당 마지막 한 곳만 */
   locations: Record<Id, LastLocation>;
   /** 알림 구독: 사용자별 기기 목록 */
