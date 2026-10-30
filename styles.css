@@ -372,3 +372,12 @@ a.btn { text-decoration: none; color: inherit; display: inline-flex; align-items
 .ai-reason { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
 .rec.alt { background: var(--surface); color: var(--accent); border: 1px solid var(--accent); }
 @media (prefers-reduced-motion: reduce) { .bubble.typing span, .ai-result { animation: none; } }
+.ai-av { background: none; width: 30px; height: 30px; }
+.prof-head { display: flex; align-items: center; gap: 12px; }
+.way-ic { width: 52px; height: 52px; display: grid; place-items: center; }
+.prof { display: block; flex: none; }
+.prof-think { animation: prof-tilt 1.6s ease-in-out infinite; transform-origin: 50% 90%; }
+.prof-happy { animation: prof-hop .6s cubic-bezier(.3,1.8,.5,1) both; }
+@keyframes prof-tilt { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-6deg); } }
+@keyframes prof-hop { from { transform: translateY(4px) scale(.94); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .prof-think, .prof-happy { animation: none; } }

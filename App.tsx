@@ -3,6 +3,7 @@ import { ConsentChecks, DeleteAccount, DocSheet, InstallCard, PlaceCard, PushTog
 import { j, josaOf } from './josa';
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ELEMENTS, METAPHOR_NOTICE, pairContent } from './elements';
+import { Professor, PROF } from './Professor';
 import { AI_LIMITS, type AiReply, type AiTurn } from './advisor';
 import { kindLabel, moleculeById, type ElementId } from './molecules';
 import { CONTEXT_LABEL, QUESTIONS, scoreQuiz } from './quiz';
@@ -270,16 +271,16 @@ function FindWay({ onAi, onQuiz, onBack }: { onAi: () => void; onQuiz: () => voi
       <div className="stack-s"><span className="eyebrow">나의 원소 찾기</span><h1>어떻게 찾아볼까요?</h1>
         <p className="small muted">어느 쪽이든 추천은 참고일 뿐이고, 마지막엔 원소 설명을 비교해서 직접 골라요.</p></div>
       <button className="option way" onClick={onAi}>
-        <span className="row" style={{ flexWrap: 'nowrap', gap: 12 }}><span className="way-ic" aria-hidden="true">💬</span>
-          <span className="stack-s grow" style={{ gap: 2 }}><strong>AI와 대화하며 찾기 <span className="chip on">추천</span></strong>
-            <span className="small muted">AI 상담사가 4~5개를 물어보고, 내 답을 근거로 어울리는 원소 3개를 골라 줘요. 3분쯤 걸려요.</span></span></span>
+        <span className="row" style={{ flexWrap: 'nowrap', gap: 12 }}><span className="way-ic" aria-hidden="true"><Professor size={52} mood="happy" /></span>
+          <span className="stack-s grow" style={{ gap: 2 }}><strong>벤 교수님과 상담하기 <span className="chip on">추천</span></strong>
+            <span className="small muted">유기화학 연구실의 벤 교수님(AI)이 4~5개를 물어보고, 내 답을 근거로 어울리는 원소 3개를 골라 줘요. 3분쯤 걸려요.</span></span></span>
       </button>
       <button className="option way" onClick={onQuiz}>
         <span className="row" style={{ flexWrap: 'nowrap', gap: 12 }}><span className="way-ic" aria-hidden="true">📝</span>
           <span className="stack-s grow" style={{ gap: 2 }}><strong>질문 {QUESTIONS.length}개 고르기</strong>
             <span className="small muted">보기 중에 고르기만 하면 돼요. 1분이면 끝나요.</span></span></span>
       </button>
-      <p className="small muted">{backend.mode === 'demo' ? '시연판의 AI 상담은 실제 AI 대신 정해진 질문과 규칙으로 흉내만 내요.' : 'AI 상담 대화는 추천을 만들기 위해 Google Gemini로 보내지고, 분자친구 서버에는 저장하지 않아요. 이름·연락처 같은 개인 정보는 적지 마세요.'}</p>
+      <p className="small muted">{backend.mode === 'demo' ? '시연판의 벤 교수님은 실제 AI 대신 정해진 질문과 규칙으로 흉내만 내요.' : '벤 교수님은 AI 캐릭터예요. 상담 대화는 추천을 만들기 위해 Google Gemini로 보내지고, 분자친구 서버에는 저장하지 않아요. 이름·연락처 같은 개인 정보는 적지 마세요.'}</p>
     </div>
   );
 }
@@ -312,19 +313,22 @@ function AiAdvisor({ onDone, onQuiz }: { onDone: () => void; onQuiz: () => void 
   };
   return (
     <div className="stack ai-page" style={{ gap: 12 }}>
-      <div className="row between"><div className="stack-s" style={{ gap: 0 }}><span className="eyebrow">AI 원소 상담</span><h2>나와 닮은 원소 찾기</h2></div>
-        <button className="btn sm ghost" onClick={onQuiz}>질문으로 할래요</button></div>
+      <div className="prof-head">
+        <Professor size={64} mood={result ? 'happy' : busy ? 'think' : 'idle'} />
+        <div className="stack-s grow" style={{ gap: 0 }}><span className="eyebrow">원소 상담 · AI 캐릭터</span><h2>{PROF.name}</h2><span className="small muted">{PROF.title}</span></div>
+        <button className="btn sm ghost" onClick={onQuiz}>질문으로 할래요</button>
+      </div>
       <div className="chat ai-chat" ref={ref} aria-live="polite">
         {turns.map((t, i) => (
           <div key={i} className={`msg${t.role === 'user' ? ' mine' : ''}`}>
-            {t.role === 'ai' && <span className="ai-av" aria-hidden="true">AI</span>}
-            <div className="bubble">{t.text}</div>
+            {t.role === 'ai' && <span className="ai-av" aria-hidden="true"><Professor size={30} /></span>}
+            <div className="bubble">{t.role === 'ai' && <><span className="small" style={{ fontWeight: 700 }}>{PROF.name}</span><br /></>}{t.text}</div>
           </div>
         ))}
-        {busy && <div className="msg"><span className="ai-av" aria-hidden="true">AI</span><div className="bubble typing" aria-label="AI가 답을 쓰는 중"><span /><span /><span /></div></div>}
+        {busy && <div className="msg"><span className="ai-av" aria-hidden="true"><Professor size={30} mood="think" /></span><div className="bubble typing" aria-label="교수님이 생각하는 중"><span /><span /><span /></div></div>}
         {result && (
           <div className="panel ai-result">
-            <span className="eyebrow">추천 원소</span>
+            <div className="row" style={{ gap: 8 }}><Professor size={34} mood="happy" /><span className="eyebrow">{PROF.name}의 추천 원소</span></div>
             {result.ranking.map((p, i) => (
               <div key={p.element} className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start', gap: 10 }}>
                 <Atom el={p.element} size={i === 0 ? 40 : 32} />
@@ -339,7 +343,7 @@ function AiAdvisor({ onDone, onQuiz }: { onDone: () => void; onQuiz: () => void 
       {!result && (
         <>
           <form className="composer" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-            <input className="input" value={txt} onChange={(e) => setTxt(e.target.value)} maxLength={AI_LIMITS.maxChars} placeholder={busy ? 'AI가 답하는 중…' : '자유롭게 답해 주세요'} aria-label="AI에게 답하기" disabled={busy || !turns.length} />
+            <input className="input" value={txt} onChange={(e) => setTxt(e.target.value)} maxLength={AI_LIMITS.maxChars} placeholder={busy ? '교수님이 생각하는 중…' : '교수님께 자유롭게 답해 주세요'} aria-label="교수님께 답하기" disabled={busy || !turns.length} />
             <button className="btn primary" disabled={busy || !txt.trim()}>보내기</button>
           </form>
           {answers >= AI_LIMITS.minAnswersToFinish && <button className="btn ghost block" disabled={busy} onClick={() => void ask(turns, true)}>이 정도면 됐어요, 결과 볼래요</button>}
@@ -426,7 +430,7 @@ function Choose({ onRetake }: { onRetake: () => void }) {
   return (
     <div className="stack" style={{ gap: 18 }}>
       <div className="stack-s">
-        <span className="eyebrow">{isAi ? 'AI 상담 결과' : '테스트 결과'}</span>
+        <span className="eyebrow">{isAi ? `${PROF.name} 상담 결과` : '테스트 결과'}</span>
         <h1>추천 원소는 {j(ELEMENTS[last.recommended].name, '이에요/예요')}</h1>
         <p className="muted small">다른 원소 설명도 비교해 보고 직접 골라 주세요. 추천과 달라도 괜찮아요.</p>
       </div>
@@ -437,7 +441,7 @@ function Choose({ onRetake }: { onRetake: () => void }) {
           </button>
         ))}
       </div>
-      {isAi && last.aiReasons?.[sel] && <div className="panel ai-reason"><span className="eyebrow">AI가 본 이유</span><p className="small">{last.aiReasons[sel]}</p></div>}
+      {isAi && last.aiReasons?.[sel] && <div className="panel ai-reason"><span className="row" style={{ gap: 6 }}><Professor size={26} mood="happy" /><span className="eyebrow">{PROF.name}의 한마디</span></span><p className="small">{last.aiReasons[sel]}</p></div>}
       <div className="panel"><ElementDetail el={sel} /></div>
       {!confirming ? (
         <div className="stack-s">
