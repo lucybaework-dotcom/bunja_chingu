@@ -15,7 +15,7 @@ export function systemPrompt(): string {
     return `- ${e} (${c.name}): ${c.personality} 강점: ${c.strengths.join(', ')}. 어려운 점: ${c.difficulties.join(', ')}.`;
   }).join('\n');
   return [
-    '너는 대학생 친구 매칭 앱 "몰링크"의 캐릭터 "벤 교수님"이야. 유기화학 연구실을 30년 넘게 지킨 다정하고 살짝 엉뚱한 노교수야. 흰 가운에 동그란 안경, 벤젠 고리처럼 뻗친 흰머리가 특징이고, 연구실 커피(카페인 분자)를 좋아해.',
+    '너는 대학생 친구 매칭 앱 "몰링크"의 캐릭터 "벤 교수님"이야. 유기화학 연구실을 30년 넘게 지킨 깜찍하고 다정한 큐티 교수님이야. 흰 가운에 동그란 안경, 벤젠 고리처럼 뻗친 흰머리가 특징이고, 연구실 커피(카페인 분자)를 좋아해.',
     '학생과 짧게 상담하면서 사람을 만나고 어울리는 방식을 알아내고, 아래 원소 중 가장 잘 어울리는 원소 3개를 추천해.',
     '원소와 성격을 잇는 건 앱이 만든 재미있는 비유일 뿐 성격 진단이 아니야. 진단처럼 단정하지 마.',
     '',
@@ -23,7 +23,8 @@ export function systemPrompt(): string {
     els,
     '',
     '[대화 규칙]',
-    '- 말투: 학생을 아끼는 교수님처럼 다정한 해요체. "허허", "오호", "흥미롭군요" 같은 감탄을 가끔 섞고, 학생의 답을 결합·촉매·끓는점 같은 화학 비유로 한 마디 받아 준 뒤 다음 질문으로 넘어가. 반말이나 "자네"는 쓰지 마.',
+    '- 말투: 깜찍하고 발랄한 해요체. 웃을 때는 "홍홍~"을 쓰고(한 답에 한 번 정도), 문장 끝에 "~"를 가끔 붙여. 예: "홍홍~ 산책 좋아하는군요! 그럼 약속은 먼저 잡는 편이에요?" 학생의 답을 결합·반응 같은 화학 비유로 귀엽게 한 마디 받아 준 뒤 다음 질문으로 넘어가.',
+    '- 쓰지 말 것: "~용", "~당" 같은 애교 어미, 반말, "자네", "허허".',
     '- 아주 짧게: 한 번에 1~2문장, 80자 이내. 감탄이나 비유는 짧게 한 마디만. 이모지는 쓰지 마. 화학 지식 강의는 하지 마.',
     '- 첫 인사는 "벤 교수예요" 한 마디 소개와 첫 질문만.',
     '- 한 번에 질문은 하나만. 모임에서의 역할, 처음 만난 사람과의 대화, 약속과 계획, 에너지를 채우는 방식, 친구에게 듣는 말 같은 일상적인 주제로 물어봐.',
@@ -52,7 +53,7 @@ export function cleanReply(raw: unknown, userAnswers: number): AiReply {
   }
   const done = o.done === true && ranking.length > 0 && userAnswers >= AI_LIMITS.minAnswersToFinish;
   if (!reply && !done) throw new Error('empty');
-  return { reply: reply || '허허, 좋은 이야기였어요. 결과를 정리해 봤어요.', done, ranking: done ? ranking : [] };
+  return { reply: reply || '홍홍~ 좋은 이야기였어요. 결과 나왔어요!', done, ranking: done ? ranking : [] };
 }
 
 /** 받은 대화 기록을 정리한다. 이상하면 null */
@@ -70,10 +71,10 @@ export function cleanHistory(h: unknown): AiTurn[] | null {
 
 // ───── 시연판: 서버 없이 정해진 질문과 낱말로 추천 ─────
 const DEMO_Q = [
-  '어서 와요, 벤 교수예요. 처음 보는 사람들 사이에선 어떤 편이에요?',
-  '오호. 약속은 먼저 짜는 편이에요, 따라가는 편이에요?',
-  '흥미롭군요. 지칠 땐 사람을 만나요, 혼자 쉬어요?',
-  '마지막! 친구들이 나를 뭐라고 해요?',
+  '홍홍~ 반가워요, 벤 교수예요! 처음 보는 사람들 사이에선 어떤 편이에요?',
+  '오~ 그렇군요! 약속은 먼저 짜는 편이에요, 따라가는 편이에요?',
+  '홍홍~ 좋아요! 지칠 땐 사람을 만나요, 혼자 쉬어요?',
+  '마지막이에요~ 친구들이 나를 뭐라고 해요?',
 ];
 const WORDS: Record<'spark' | 'depth' | 'steady', string[]> = {
   spark: ['먼저', '말 걸', '활발', '신나', '재밌', '즉흥', '새로운', '사람 만나', '분위기', '웃', '시끄', '외향', '파티', '놀'],
@@ -88,7 +89,7 @@ export function demoAdvisor(history: AiTurn[], finish: boolean): AiReply {
     for (const k of Object.keys(WORDS) as (keyof typeof WORDS)[]) for (const w of WORDS[k]) if (text.includes(w)) v[k] = Math.min(1, v[k] + 0.15);
     const d = (e: ElementId) => { const a = ELEMENTS[e].axes; return (a.spark - v.spark) ** 2 + (a.depth - v.depth) ** 2 + (a.steady - v.steady) ** 2; };
     const top = [...usableElements()].sort((a, b) => d(a) - d(b)).slice(0, 3);
-    return { reply: '허허, 결과 나왔어요!', done: true,
+    return { reply: '홍홍~ 결과 나왔어요!', done: true,
       ranking: top.map((e) => ({ element: e, reason: ELEMENTS[e].personality })) };
   }
   return { reply: DEMO_Q[answers.length], done: false, ranking: [] };

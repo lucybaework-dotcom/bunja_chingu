@@ -17,7 +17,7 @@ export function roomSystemPrompt(el: ElementId): string {
     return `- ${m.id}: ${m.formula} ${m.name}, ${m.totalAtoms}명 (${Object.entries(m.atomCounts).map(([e, n]) => `${e}×${n}`).join(' ')})${pairs ? `, 궁합: ${pairs}` : ''}`;
   }).join('\n');
   return [
-    '너는 대학생 친구 매칭 앱 "몰링크"의 캐릭터 "벤 교수님"(다정한 유기화학 노교수)이야.',
+    '너는 대학생 친구 매칭 앱 "몰링크"의 캐릭터 "벤 교수님"(깜찍하고 다정한 유기화학 큐티 교수님)이야. 말투는 발랄한 해요체, 웃을 땐 "홍홍~". "~용" 같은 애교 어미와 반말은 쓰지 마.',
     `학생의 원소는 ${me.name}(${el})야. 성격 비유: ${me.personality}`,
     '학생이 원하는 모임을 말하면, 아래 분자 중 그 모임에 가장 잘 맞는 것을 1~3개 골라.',
     '고르는 기준: 모임 인원(분자의 인원 수), 모임 분위기, 학생 원소와 함께할 원소들의 궁합.',
@@ -26,7 +26,7 @@ export function roomSystemPrompt(el: ElementId): string {
     mols,
     '',
     '[출력] JSON 하나만:',
-    '{"reply": "짧은 한마디(40자 이내, 해요체)", "roomName": "모임에 어울리는 실험실 이름(2~20자)", "picks": [{"molecule": "분자 id", "reason": "어떤 원소와 궁합이 좋아서 이 모임에 맞는지 한 문장, 45자 이내"}]}',
+    '{"reply": "짧은 한마디(40자 이내, 예: 홍홍~ 산책하기 좋은 모임이에요!)", "roomName": "모임에 어울리는 실험실 이름(2~20자)", "picks": [{"molecule": "분자 id", "reason": "어떤 원소와 궁합이 좋아서 이 모임에 맞는지 귀여운 말투로 한 문장, 45자 이내"}]}',
     '- picks는 가장 잘 맞는 순서로. 목록에 없는 id는 쓰지 마. 이모지 금지. 건강·연애·정치 같은 민감한 모임은 무난한 모임으로 바꿔서 추천해.',
   ].join('\n');
 }
@@ -72,8 +72,8 @@ export function demoRoomAdvice(el: ElementId, text: string): RoomAdvice {
     const m = moleculeById(id)!;
     const o = (Object.keys(m.atomCounts) as ElementId[]).find((e) => e !== el);
     const p = o ? pairContent(el, o)[0] : undefined;
-    return o && p ? `${ELEMENTS[o].name}${josaOf(ELEMENTS[o].name, '과/와')} '${p.title}' 궁합이라 잘 맞아요.` : `${m.totalAtoms}명이 모이기 딱 좋아요.`;
+    return o && p ? `${ELEMENTS[o].name}${josaOf(ELEMENTS[o].name, '과/와')} '${p.title}' 궁합이라 잘 맞아요~` : `${m.totalAtoms}명이 모이기 딱 좋아요.`;
   };
   const name = text.replace(/\s+/g, ' ').trim().slice(0, 20);
-  return { reply: '허허, 이런 분자가 어울리겠어요.', picks: top.map((m) => ({ molecule: m.id, reason: why(m.id) })), roomName: name.length >= 2 ? name : '' };
+  return { reply: '홍홍~ 이런 분자가 딱이에요!', picks: top.map((m) => ({ molecule: m.id, reason: why(m.id) })), roomName: name.length >= 2 ? name : '' };
 }
