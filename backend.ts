@@ -6,6 +6,7 @@ import { apply, normalize, remindMeetings, type Command } from './engine';
 import { DomainError, type State } from './types';
 import { seedState } from './seed';
 import { demoAdvisor, type AiReply, type AiTurn } from './advisor';
+import { demoRoomAdvice, type RoomAdvice } from './roomAdvisor';
 
 export type AiResult = { ok: true; reply: AiReply } | { ok: false; error: string };
 
@@ -20,6 +21,8 @@ export interface Backend {
   signOut?(): Promise<void>;
   /** AI 원소 상담 한 번 주고받기 */
   ai(history: AiTurn[], finish: boolean, onPartial?: (text: string) => void): Promise<AiResult>;
+  /** 원하는 모임 → 분자 추천 */
+  aiRoom(request: string): Promise<{ ok: true; room: RoomAdvice } | { ok: false; error: string }>;
 }
 
 const KEY = 'bunja-chingu-demo-v1';
@@ -58,6 +61,12 @@ export class LocalBackend implements Backend {
       if (e instanceof DomainError) return { ok: false, error: e.message };
       throw e;
     }
+  }
+  async aiRoom(request: string) {
+    await new Promise((r) => setTimeout(r, 600));
+    const el = this.state.meId ? this.state.users[this.state.meId]?.elementId : null;
+    if (!el) return { ok: false as const, error: '먼저 원소를 정해 주세요.' };
+    return { ok: true as const, room: demoRoomAdvice(el, request) };
   }
   /** 시연판: 서버와 AI 없이 정해진 질문으로 상담을 흉내 낸다 */
   async ai(history: AiTurn[], finish: boolean, onPartial?: (text: string) => void): Promise<AiResult> {
@@ -138,6 +147,14 @@ export class RemoteBackend implements Backend {
     } catch {
       return { ok: false, error: '인터넷 연결을 확인하고 다시 시도해 주세요.' };
     }
+  }
+  async aiRoom(request: string) {
+    try {
+      const r = await this.t.call({ action: 'aiRoom', request });
+      if (r.json.view) this.set(r.json.view as State);
+      if (r.status !== 200 || !r.json.room) return { ok: false as const, error: String(r.json.error ?? '교수님이 답하지 못했어요.') };
+      return { ok: true as const, room: r.json.room as RoomAdvice };
+    } catch { return { ok: false as const, error: '인터넷 연결을 확인하고 다시 시도해 주세요.' }; }
   }
   async ai(history: AiTurn[], finish: boolean, onPartial?: (text: string) => void): Promise<AiResult> {
     if (this.t.stream) {

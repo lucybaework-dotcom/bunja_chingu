@@ -404,3 +404,7 @@ a.btn { text-decoration: none; color: inherit; display: inline-flex; align-items
 @media (prefers-reduced-motion: reduce) { .tcard-face.r-diamond, .tcard-face.r-rainbow, .dex.owned.r-diamond, .dex.owned.r-rainbow, .tcard-face.r-diamond::after, .tcard-face.r-rainbow::after { animation: none; } }
 .update-bar { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 50; width: min(420px, calc(100% - 32px)); display: block; border: none; cursor: pointer; padding: 10px 14px; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-size: 14px; box-shadow: 0 8px 20px rgb(0 0 0 / .2); animation: bar-in .4s cubic-bezier(.3,1.5,.5,1) both; }
 @keyframes bar-in { from { transform: translate(-50%, -20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+.prof-ask { background: var(--surface); border: 1px solid var(--line); padding: 10px 14px; border-radius: 16px 16px 16px 4px; font-weight: 600; }
+.option.mol-pick { display: flex; flex-direction: column; align-items: stretch; gap: 6px; text-align: left; }
+.option.mol-pick.best { border-color: var(--accent); background: var(--accent-soft); }
+.mol-chip { font-size: 17px; padding: 6px 14px; }

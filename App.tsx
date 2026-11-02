@@ -5,6 +5,7 @@ import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useSta
 import { ELEMENTS, METAPHOR_NOTICE, pairContent } from './elements';
 import { Professor, PROF } from './Professor';
 import { AI_LIMITS, type AiReply, type AiTurn } from './advisor';
+import { ROOM_REQ_MAX, type RoomAdvice } from './roomAdvisor';
 import { kindLabel, moleculeById, type ElementId } from './molecules';
 import { CONTEXT_LABEL, QUESTIONS, scoreQuiz } from './quiz';
 import type { Backend, DispatchResult } from './backend';
@@ -617,65 +618,126 @@ function RoomsList() {
   );
 }
 
-// ───────── 6. 실험실 만들기 ─────────
+// ───────── 6. 실험실 만들기: 교수님 추천 또는 직접 고르기 → 이름·시각 ─────────
+const ROOM_EXAMPLES = ['점심 같이 먹을 2명', '카페에서 수다 떨 4명', '시험공부 같이 할 사람', '주말 보드게임 6명'];
 function CreateRoom() {
-  const { s, viewer, run, go } = useApp();
+  const { s, viewer, run, go, backend } = useApp();
   const el = s.users[viewer].elementId!;
   const cands = moleculesWith(el).sort((a, b) => a.totalAtoms - b.totalAtoms);
-  const [mol, setMol] = useState(cands[0]?.id ?? '');
+  const [step, setStep] = useState<'ai' | 'manual' | 'details'>('ai');
+  const [mol, setMol] = useState('');
+  const [why, setWhy] = useState('');
   const [policy, setPolicy] = useState<'immediate' | 'afterComplete'>('immediate');
   const [days, setDays] = useState(s.config.defaultRecruitDays);
   const [name, setName] = useState('');
   const [when, setWhen] = useState('');
-  const groups = [...new Set(cands.map((m) => m.totalAtoms))];
+  const [more, setMore] = useState(false);
+  const [req, setReq] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [advice, setAdvice] = useState<RoomAdvice | null>(null);
+  const ask = async (text: string) => {
+    if (text.trim().length < 2 || busy) return;
+    setBusy(true); setErr(''); setAdvice(null);
+    const r = await backend.aiRoom(text.trim());
+    setBusy(false);
+    if (r.ok) setAdvice(r.room); else setErr(r.error);
+  };
+  const choose = (id: string, reason = '', suggested = '') => { setMol(id); setWhy(reason); if (suggested && !name) setName(suggested.slice(0, ROOM_NAME_MAX)); setStep('details'); window.scrollTo({ top: 0 }); };
+  const m = moleculeById(mol);
   return (
-    <div className="stack" style={{ gap: 18 }}>
-      <button className="back" onClick={() => go({ k: 'rooms' })}>← 실험실</button>
+    <div className="stack" style={{ gap: 16 }}>
+      <button className="back" onClick={() => (step === 'details' ? setStep(advice ? 'ai' : 'manual') : go({ k: 'rooms' }))}>← {step === 'details' ? '분자 다시 고르기' : '실험실'}</button>
       <h1>새 실험실 열기</h1>
-      <section className="stack-s">
-        <label htmlFor="room-name"><h3>실험실 이름 (필수)</h3></label>
-        <input id="room-name" className="input" maxLength={ROOM_NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 2시에 밥 먹을 사람" />
-        <span className="small muted mono">{name.trim().length}/{ROOM_NAME_MAX}</span>
-      </section>
-      <section className="stack-s">
-        <label htmlFor="room-when"><h3>모이는 시각 (선택)</h3></label>
-        <input id="room-when" className="input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
-      </section>
-      <h2>어떤 분자를 만들까요?</h2>
-      {groups.map((n) => (
-        <section key={n} className="stack-s">
-          <span className="eyebrow">{n}명</span>
-          <div className="stack-s">
-            {cands.filter((m) => m.totalAtoms === n).map((m) => (
-              <Fragment key={m.id}>
-              <button className={`option${mol === m.id ? ' sel' : ''}`} onClick={() => setMol(m.id)} aria-pressed={mol === m.id}>
-                <div className="row between" style={{ flexWrap: 'nowrap' }}>
-                  <span className="row"><Formula f={m.formula} style={{ fontSize: 18, minWidth: 74 }} /><span>{m.name}</span>{m.kind === 'ionic' && <span className="chip">이온 결정</span>}</span>
-                  <MoleculeStrip formula={m.formula} target={m.atomCounts} members={[]} size={18} labels={false} />
-                </div>
-              </button>
-              {mol === m.id && <div className="panel" style={{ padding: 10 }}><Molecule3D id={m.id} height={150} label={m.name} /></div>}
-              </Fragment>
-            ))}
-          </div>
-        </section>
-      ))}
-      <section className="stack-s">
-        <h3>채팅은 언제부터?</h3>
-        <div className="seg">
-          <button className={policy === 'immediate' ? 'on' : ''} onClick={() => setPolicy('immediate')} aria-pressed={policy === 'immediate'}>입장하면 바로</button>
-          <button className={policy === 'afterComplete' ? 'on' : ''} onClick={() => setPolicy('afterComplete')} aria-pressed={policy === 'afterComplete'}>분자 완성 후</button>
+      {step !== 'details' && (
+        <div className="seg" role="tablist">
+          <button role="tab" aria-selected={step === 'ai'} className={step === 'ai' ? 'on' : ''} onClick={() => setStep('ai')}>교수님 추천</button>
+          <button role="tab" aria-selected={step === 'manual'} className={step === 'manual' ? 'on' : ''} onClick={() => setStep('manual')}>직접 고르기</button>
         </div>
-      </section>
-      <section className="stack-s">
-        <label htmlFor="days-in"><h3>모집 기한</h3></label>
-        <select id="days-in" className="input" value={days} onChange={(e) => setDays(+e.target.value)}>
-          {[1, 2, 3, 5, 7].map((d) => <option key={d} value={d}>{d}일</option>)}
-        </select>
-      </section>
-      <button className="btn primary block" disabled={!mol || name.trim().length < 2} onClick={async () => { const r = await run({ type: 'createRoom', actor: viewer, moleculeId: mol, chatPolicy: policy, recruitDays: days, name, meetAt: when ? new Date(when).getTime() : null }, '실험실을 만들었어요.'); if (r.ok) go({ k: 'room', id: r.createdId! }); }}>
-        {name.trim().length < 2 ? '실험실 이름을 먼저 정해 주세요' : `${moleculeById(mol)?.formula ?? ''} 실험실 만들기`}
-      </button>
+      )}
+      {step === 'ai' && (
+        <section className="stack" style={{ gap: 12 }}>
+          <div className="row" style={{ flexWrap: 'nowrap', gap: 10 }}>
+            <Professor size={48} mood={busy ? 'think' : advice ? 'happy' : 'idle'} />
+            <div className="bubble prof-ask">어떤 모임을 원해요?</div>
+          </div>
+          <form className="composer" onSubmit={(e) => { e.preventDefault(); void ask(req); }}>
+            <input className="input" value={req} maxLength={ROOM_REQ_MAX} onChange={(e) => setReq(e.target.value)} placeholder="예: 점심 같이 먹을 2명" aria-label="원하는 모임" />
+            <button className="btn primary" disabled={busy || req.trim().length < 2}>추천</button>
+          </form>
+          {!advice && !busy && <div className="row" style={{ gap: 6 }}>{ROOM_EXAMPLES.map((x) => <button key={x} className="chip pick" onClick={() => { setReq(x); void ask(x); }}>{x}</button>)}</div>}
+          {busy && <div className="msg"><span className="ai-av" aria-hidden="true"><Professor size={30} mood="think" /></span><div className="bubble typing" aria-label="교수님이 고르는 중"><span /><span /><span /></div></div>}
+          {err && <p className="small" style={{ color: 'var(--bad)' }}>{err}</p>}
+          {advice && (
+            <div className="stack-s">
+              {advice.reply && <p className="small muted">{advice.reply}</p>}
+              {advice.picks.map((p, i) => { const pm = moleculeById(p.molecule)!; return (
+                <button key={p.molecule} className={`option mol-pick${i === 0 ? ' best' : ''}`} onClick={() => choose(p.molecule, p.reason, advice.roomName)}>
+                  <span className="row between" style={{ flexWrap: 'nowrap' }}>
+                    <span className="row" style={{ gap: 10 }}><Formula f={pm.formula} style={{ fontSize: 24 }} /><span className="stack-s" style={{ gap: 0 }}><strong>{pm.name}</strong><span className="small muted">{pm.totalAtoms}명{i === 0 ? ' · 최고 궁합' : ''}</span></span></span>
+                    <MoleculeStrip formula={pm.formula} target={pm.atomCounts} members={[]} size={18} labels={false} />
+                  </span>
+                  {p.reason && <span className="small">{p.reason}</span>}
+                </button>
+              ); })}
+            </div>
+          )}
+        </section>
+      )}
+      {step === 'manual' && (
+        <section className="stack-s">
+          {[...new Set(cands.map((x) => x.totalAtoms))].map((n) => (
+            <div key={n} className="stack-s">
+              <span className="eyebrow">{n}명</span>
+              <div className="row" style={{ gap: 6 }}>
+                {cands.filter((x) => x.totalAtoms === n).map((x) => (
+                  <button key={x.id} className="chip pick mol-chip" onClick={() => choose(x.id)} aria-label={x.name}><Formula f={x.formula} /></button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+      {step === 'details' && m && (
+        <>
+          <div className="panel" style={{ gap: 8 }}>
+            <div className="row between" style={{ flexWrap: 'nowrap' }}>
+              <span className="row" style={{ gap: 10 }}><Formula f={m.formula} style={{ fontSize: 28 }} /><span className="stack-s" style={{ gap: 0 }}><strong>{m.name}</strong><span className="small muted">{m.totalAtoms}명</span></span></span>
+              <MoleculeStrip formula={m.formula} target={m.atomCounts} members={[]} size={20} labels={false} />
+            </div>
+            {why && <p className="small row" style={{ gap: 6, flexWrap: 'nowrap', alignItems: 'flex-start' }}><Professor size={22} mood="happy" /><span>{why}</span></p>}
+            <Molecule3D id={m.id} height={140} label={m.name} />
+          </div>
+          <section className="stack-s">
+            <label htmlFor="room-name"><h3>실험실 이름</h3></label>
+            <input id="room-name" className="input" maxLength={ROOM_NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 2시에 밥 먹을 사람" />
+          </section>
+          <section className="stack-s">
+            <label htmlFor="room-when"><h3>모이는 시각 <span className="small muted">(선택)</span></h3></label>
+            <input id="room-when" className="input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+          </section>
+          {!more ? <button className="linkish small" style={{ alignSelf: 'flex-start' }} onClick={() => setMore(true)}>설정 더 보기</button> : (
+            <>
+              <section className="stack-s">
+                <h3>채팅 시작</h3>
+                <div className="seg">
+                  <button className={policy === 'immediate' ? 'on' : ''} onClick={() => setPolicy('immediate')} aria-pressed={policy === 'immediate'}>입장하면 바로</button>
+                  <button className={policy === 'afterComplete' ? 'on' : ''} onClick={() => setPolicy('afterComplete')} aria-pressed={policy === 'afterComplete'}>분자 완성 후</button>
+                </div>
+              </section>
+              <section className="stack-s">
+                <label htmlFor="days-in"><h3>모집 기한</h3></label>
+                <select id="days-in" className="input" value={days} onChange={(e) => setDays(+e.target.value)}>
+                  {[1, 2, 3, 5, 7].map((d) => <option key={d} value={d}>{d}일</option>)}
+                </select>
+              </section>
+            </>
+          )}
+          <button className="btn primary block" disabled={name.trim().length < 2} onClick={async () => { const r = await run({ type: 'createRoom', actor: viewer, moleculeId: mol, chatPolicy: policy, recruitDays: days, name, meetAt: when ? new Date(when).getTime() : null }, '실험실을 만들었어요.'); if (r.ok) go({ k: 'room', id: r.createdId! }); }}>
+            {name.trim().length < 2 ? '실험실 이름을 정해 주세요' : `${m.formula} 실험실 열기`}
+          </button>
+        </>
+      )}
     </div>
   );
 }

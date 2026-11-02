@@ -4,6 +4,8 @@ import { ADMIN_EMAILS } from './socialData';
 import { DomainError, type PushSub, type State } from './types';
 import { viewFor } from './view';
 import { AI_LIMITS, cleanHistory, type AiReply, type AiTurn } from './advisor';
+import { ROOM_REQ_MAX, type RoomAdvice } from './roomAdvisor';
+import type { ElementId } from './molecules';
 
 export interface Deps {
   getUser(token: string): Promise<{ id: string; email: string } | null>;
@@ -18,6 +20,8 @@ export interface Deps {
   deleteAuthUser?(uid: string): Promise<void>;
   /** AI 원소 상담 (없으면 꺼짐) */
   ai?(history: AiTurn[], finish: boolean, onText?: (replySoFar: string) => void): Promise<AiReply>;
+  /** 원하는 모임 → 분자 추천 (없으면 꺼짐) */
+  aiRoom?(el: ElementId, request: string): Promise<RoomAdvice>;
   /** 응답을 먼저 보내고 뒤에서 마저 할 일 (알림 보내기 등). 없으면 기다렸다가 응답 */
   background?(p: Promise<unknown>): void;
 }
@@ -136,6 +140,27 @@ function aiApply(s: State, uid: string, reply: AiReply, now: number): State {
 }
 const aiErr = (e: unknown) => (e as { status?: number }).status === 429 ? '교수님이 지금 바빠요. 잠시 후 다시 보내 주세요.' : '교수님이 답하지 못했어요. 다시 보내 주세요.';
 
+/** 새 실험실: 원하는 모임을 듣고 분자를 추천한다. 하루 횟수는 상담과 같이 센다 */
+async function roomAi(uid: string, request: unknown, here: { lat: number; lng: number } | null, deps: Deps): Promise<Reply> {
+  if (!deps.aiRoom) return { status: 503, body: { error: '교수님 추천이 아직 준비되지 않았어요.' } };
+  const loaded = await deps.load(); const now = deps.now();
+  const s = normalize(loaded?.state ?? emptyState()); const u = s.users[uid];
+  if (!u?.elementId || !u.elementLockedAt) return { status: 400, body: { error: '먼저 원소를 정해 주세요.' } };
+  const text = typeof request === 'string' ? request.trim().slice(0, ROOM_REQ_MAX) : '';
+  if (text.length < 2) return { status: 400, body: { error: '원하는 모임을 적어 주세요.' } };
+  const used = s.aiUsage?.[uid];
+  if (used?.day === kstDay(now) && used.n >= AI_LIMITS.perDay) return { status: 429, body: { error: '오늘 교수님 추천 횟수를 다 썼어요.' } };
+  let advice: RoomAdvice;
+  try { advice = await deps.aiRoom(u.elementId, text); } catch (e) { console.error('aiRoom', e); return { status: 502, body: { error: aiErr(e) } }; }
+  for (let i = 0; i < 5; i++) {
+    const cur = await deps.load(); const t = deps.now(); const st = normalize(cur?.state ?? emptyState());
+    const day = kstDay(t); const c = st.aiUsage?.[uid];
+    const next: State = { ...st, aiUsage: { ...(st.aiUsage ?? {}), [uid]: { day, n: (c?.day === day ? c.n : 0) + 1 } } };
+    if (await deps.save(cur ? cur.version : null, next)) return { status: 200, body: { ok: true, room: advice, view: viewFor(next, uid, here, t) } };
+  }
+  return { status: 200, body: { ok: true, room: advice } };
+}
+
 /** 교수님 답을 조금씩 흘려보낸다 (한 줄에 JSON 하나: delta → done 또는 error) */
 async function streamAi(uid: string, b: { history?: unknown; finish?: unknown }, here: { lat: number; lng: number } | null, deps: Deps): Promise<Reply> {
   const loaded = await deps.load(); const now = deps.now();
@@ -215,6 +240,7 @@ export async function handle(token: string | null, body: unknown, deps: Deps): P
   const b = (body ?? {}) as { action?: string; cmd?: unknown; here?: { lat?: unknown; lng?: unknown } };
   const here = b.here && typeof b.here.lat === 'number' && typeof b.here.lng === 'number' ? { lat: b.here.lat, lng: b.here.lng } : null;
   const isAdminEmail = ADMIN_EMAILS.includes(user.email.toLowerCase());
+  if (b.action === 'aiRoom') return roomAi(user.id, (b as { request?: unknown }).request, here, deps);
   if (b.action === 'ai' && (b as { stream?: unknown }).stream === true) return streamAi(user.id, b as { history?: unknown; finish?: unknown }, here, deps);
 
   let aiCache: AiReply | undefined;

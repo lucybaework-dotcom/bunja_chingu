@@ -1,7 +1,7 @@
 // Supabase Edge Function 진입점 (Deno). 빌드하면 server-dist/bunja-function.js 한 파일이 된다.
 import { handle, handleCron, type Deps } from './handler';
 import { b64u, sendWebPush, type VapidKeys } from './webpush';
-import { askGemini, DEFAULT_MODELS } from './gemini';
+import { askGemini, askGeminiRoom, DEFAULT_MODELS } from './gemini';
 import type { State } from './types';
 
 declare const Deno: { env: { get(k: string): string | undefined }; serve(h: (r: Request) => Response | Promise<Response>): void };
@@ -49,6 +49,8 @@ const deps: Deps = {
     const r = await fetch(`${URL_}/auth/v1/admin/users/${uid}`, { method: 'DELETE', headers: { apikey: SERVICE, Authorization: `Bearer ${SERVICE}` } });
     if (!r.ok) console.error('delete auth user', r.status, await r.text().catch(() => ''));
   },
+  ...(Deno.env.get('GEMINI_API_KEY') ? { aiRoom: (el, req) => askGeminiRoom(Deno.env.get('GEMINI_API_KEY')!, el, req,
+    Deno.env.get('GEMINI_MODEL') ? [Deno.env.get('GEMINI_MODEL')!, ...DEFAULT_MODELS] : DEFAULT_MODELS) } : {}),
   ...(Deno.env.get('GEMINI_API_KEY') ? { ai: (h, finish, onText) => askGemini(Deno.env.get('GEMINI_API_KEY')!, h, finish,
     Deno.env.get('GEMINI_MODEL') ? [Deno.env.get('GEMINI_MODEL')!, ...DEFAULT_MODELS] : DEFAULT_MODELS, fetch, onText) } : {}),
   background: (p) => { const er = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime; if (er?.waitUntil) er.waitUntil(p); else void p; },
