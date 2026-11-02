@@ -109,7 +109,7 @@ function Login({ notice }: { notice?: string }) {
         <button className="btn primary block" disabled={busy}>{busy ? '잠시만요…' : mode === 'in' ? '로그인' : '가입하기'}</button>
         {msg && <p className="small" style={{ color: msg.err ? 'var(--bad)' : 'var(--ok)' }} role="status">{msg.t}</p>}
       </form>
-      <p className="small muted">이메일은 로그인에만 쓰이고 다른 학생에게는 원소와 한 줄 소개만 보여요. <a href="#demo" onClick={() => setTimeout(() => location.reload(), 0)}>가상 사용자로 먼저 둘러보기</a></p>
+      <p className="small muted">이메일은 다른 학생에게 보이지 않아요. <a href="#demo" onClick={() => setTimeout(() => location.reload(), 0)}>가상 사용자로 먼저 둘러보기</a></p>
     </div>
   );
 }

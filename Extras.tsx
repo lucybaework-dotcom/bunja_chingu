@@ -50,7 +50,7 @@ export function TermsUpdateCard({ viewer, run }: { viewer: string; run: Run }) {
   return (
     <div className="panel warn">
       <h3>약관 동의가 필요해요</h3>
-      <p className="small">이용약관과 개인정보 처리방침이 생겼어요. 동의하면 계속 이용할 수 있어요.</p>
+      <p className="small">동의해야 계속 쓸 수 있어요.</p>
       <ConsentChecks onChange={setOk} />
       <button className="btn primary" disabled={!ok} onClick={() => run({ type: 'acceptTerms', actor: viewer, version: TERMS_VERSION }, '동의했어요.')}>동의하고 계속하기</button>
     </div>
@@ -70,7 +70,7 @@ export function DeleteAccount({ viewer, run, onDeleted }: { viewer: string; run:
       if (r.ok) onDeleted();
     }}>
       <h3>정말 탈퇴할까요?</h3>
-      <p className="small">탈퇴하면 열려 있는 실험실에서 모두 나가고(방장이면 다음 사람에게 넘어가요), 닉네임과 소개, 모은 분자 카드, 만남 기록, 반응도가 모두 지워져요. 되돌릴 수 없어요. 원소를 바꾸고 싶다면 탈퇴한 뒤 다시 가입하면 돼요.</p>
+      <p className="small">실험실에서 나가고 카드·기록·반응도가 모두 지워져요. 되돌릴 수 없어요.</p>
       <label className="stack-s" htmlFor="del-word"><span className="small">확인을 위해 <strong>{DELETE_WORD}</strong>라고 입력해 주세요.</span>
         <input id="del-word" className="input" value={word} onChange={(e) => setWord(e.target.value)} autoComplete="off" /></label>
       <div className="row"><button type="button" className="btn ghost" onClick={() => { setOpen(false); setWord(''); }}>취소</button><button className="btn danger grow" disabled={word.trim() !== DELETE_WORD || busy}>{busy ? '탈퇴하는 중…' : '탈퇴하기'}</button></div>
@@ -83,12 +83,12 @@ export function InstallCard() {
   useEffect(() => onInstallChange(() => force((n) => n + 1)), []);
   if (isStandalone()) return null;
   if (canPromptInstall()) return (
-    <div className="panel install"><div className="row between"><span className="stack-s grow" style={{ gap: 0 }}><strong>홈 화면에 앱으로 추가</strong><span className="small muted">주소창 없이 앱처럼 열리고 알림도 받을 수 있어요</span></span>
+    <div className="panel install"><div className="row between"><span className="stack-s grow" style={{ gap: 0 }}><strong>홈 화면에 앱으로 추가</strong><span className="small muted">앱처럼 쓰고 알림도 받아요</span></span>
       <button className="btn primary sm" onClick={() => void promptInstall()}>추가하기</button></div></div>
   );
   if (isIOS()) return (
     <div className="panel install"><strong>홈 화면에 앱으로 추가</strong>
-      <p className="small">Safari 아래쪽 <strong>공유 버튼(네모에 위쪽 화살표)</strong>을 누르고 <strong>홈 화면에 추가</strong>를 고르세요. 아이폰은 이렇게 추가해야 알림을 받을 수 있어요.</p></div>
+      <p className="small">Safari 아래쪽 <strong>공유 버튼(네모에 위쪽 화살표)</strong>을 누르고 <strong>홈 화면에 추가</strong>를 고르세요.</p></div>
   );
   return null;
 }
@@ -98,17 +98,17 @@ export function PushToggle({ viewer, run, demo }: { viewer: string; run: Run; de
   const [err, setErr] = useState('');
   const refresh = () => { pushState().then(setSt).catch(() => setSt('unsupported')); };
   useEffect(() => { if (!demo) refresh(); }, [demo]);
-  if (demo) return <div className="panel"><strong>알림</strong><p className="small muted">시연판에서는 폰 알림을 보낼 수 없어요. 실제 사이트에서 켤 수 있어요.</p></div>;
+  if (demo) return <div className="panel"><strong>알림</strong><p className="small muted">시연판에서는 쓸 수 없어요.</p></div>;
   const on = st === 'on';
   const msg: Record<string, string> = {
     unsupported: '이 브라우저는 알림을 지원하지 않아요.',
-    'needs-install': '아이폰은 먼저 홈 화면에 앱으로 추가한 뒤, 추가한 앱에서 알림을 켤 수 있어요.',
-    denied: '알림이 차단돼 있어요. 브라우저 설정에서 이 사이트 알림을 허용해 주세요.',
+    'needs-install': '아이폰은 홈 화면에 추가한 앱에서 켤 수 있어요.',
+    denied: '브라우저 설정에서 알림을 허용해 주세요.',
   };
   return (
     <div className="panel" style={{ gap: 8 }}>
       <div className="row between">
-        <span className="stack-s grow" style={{ gap: 0 }}><strong>폰 알림 받기</strong><span className="small muted">새 채팅, 합류, 만남 확인, 약속 장소 알림</span></span>
+        <span className="stack-s grow" style={{ gap: 0 }}><strong>폰 알림 받기</strong><span className="small muted">채팅·합류·약속 알림</span></span>
         <button role="switch" aria-checked={on} className={`switch${on ? ' on' : ''}`} disabled={st === 'loading' || !!msg[st]} onClick={async () => {
           setErr('');
           if (on) { const ep = await unsubscribePush(); if (ep) await run({ type: 'removePush', actor: viewer, endpoint: ep }, '알림을 껐어요.'); }
@@ -153,7 +153,7 @@ export function PlaceCard({ room, isHost, run, viewer }: { room: Room; isHost: b
             <a className="btn sm ghost" href={`https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lng}#map=18/${p.lat}/${p.lng}`} target="_blank" rel="noreferrer">OpenStreetMap</a>
           </div>
         </>
-      ) : <p className="small muted">방장이 지도에서 만날 곳을 찍으면 구성원 모두에게 알림이 가요.</p>}
+      ) : <p className="small muted">방장이 정하면 알려 드려요.</p>}
       {picking && <PlacePicker room={room} onClose={() => setPicking(false)} onSave={async (place) => { const r = await run({ type: 'setPlace', actor: viewer, roomId: room.id, place }, '약속 장소를 정했어요.'); if (r.ok) setPicking(false); }}
         onClear={p ? async () => { const r = await run({ type: 'setPlace', actor: viewer, roomId: room.id, place: null }, '약속 장소를 지웠어요.'); if (r.ok) setPicking(false); } : undefined} />}
     </div>
@@ -184,7 +184,7 @@ function PlacePicker({ room, onClose, onSave, onClear }: { room: Room; onClose: 
     <div className="sheet-bg" onClick={onClose}>
       <form className="sheet" role="dialog" aria-label="약속 장소 정하기" onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); if (pt) onSave({ ...pt, label }); }}>
         <div className="row between"><h2>약속 장소 정하기</h2><button type="button" className="btn sm" onClick={onClose}>닫기</button></div>
-        <p className="small muted">지도를 눌러 만날 곳을 찍어 주세요. 학교에서 5km 안이면 돼요.</p>
+        <p className="small muted">지도를 눌러 찍어 주세요.</p>
         <div className="mapbox" ref={el} />
         <label className="stack-s" htmlFor="place-label"><span className="small" style={{ fontWeight: 600 }}>장소 이름</span>
           <input id="place-label" className="input" maxLength={30} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="예: 학생회관 1층 입구" /></label>

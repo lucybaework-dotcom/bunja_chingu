@@ -70,7 +70,7 @@ export default function Nearby({ s, viewer, now, onOpenRoom, refresh }: { s: Sta
     <div className="stack">
       <div className="stack-s">
         <h1>내 주변 원자 찾기</h1>
-        <p className="small muted">{CAMPUS.name} 안에서 위치를 공유 중인 방장이 지도에 보여요. 내 위치는 저장하지 않고 지금 화면에만 써요.</p>
+        <p className="small muted">{CAMPUS.name} 에서 위치를 공유 중인 방장이 보여요.</p>
       </div>
       <div className="mapbox" ref={mapEl} aria-label="캠퍼스 지도" />
       <div className="row between">
@@ -78,8 +78,8 @@ export default function Nearby({ s, viewer, now, onOpenRoom, refresh }: { s: Sta
         <button className="btn sm" onClick={locate} disabled={busy}>{busy ? '찾는 중…' : '내 위치 다시 찾기'}</button>
       </div>
       {err && <div className="panel warn"><p className="small">{err}</p></div>}
-      {here && !onCampus && <div className="panel flat"><p className="small">이 기능은 캠퍼스 안에서만 쓸 수 있어요. 캠퍼스에 들어오면 주변 실험실이 보여요.</p></div>}
-      {onCampus && rows.length === 0 && <div className="panel flat"><p className="small muted">지금 캠퍼스에서 위치를 공유 중인 방장이 없어요. 내가 방장이라면 실험실 화면에서 위치 공유를 켤 수 있어요.</p></div>}
+      {here && !onCampus && <div className="panel flat"><p className="small">캠퍼스 안에서만 쓸 수 있어요.</p></div>}
+      {onCampus && rows.length === 0 && <div className="panel flat"><p className="small muted">위치를 공유 중인 방장이 없어요.</p></div>}
       {rows.map(({ room, host, d }) => {
         const m = moleculeById(room.targetMoleculeId)!; const he = s.users[host]?.elementId;
         return (

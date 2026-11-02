@@ -19,7 +19,7 @@ export function VacancyToggle({ s, viewer, run }: { s: State; viewer: string; ru
     <div className="panel">
       <div className="row between" style={{ flexWrap: 'nowrap' }}>
         <span className="stack-s grow" style={{ gap: 0 }}><strong>내 원소 빈자리 알림</strong>
-          <span className="small muted">{ELEMENTS[me.elementId!].name} 자리가 있는 실험실이 새로 열리면 알려 줘요. 이미 모집 중인 실험실에 있거나 자동 매칭 중이면 보내지 않고, 30분에 한 번까지만 와요.</span></span>
+          <span className="small muted">{ELEMENTS[me.elementId!].name} 자리가 생기면 알려 줘요.</span></span>
         <button role="switch" aria-checked={on} aria-label="내 원소 빈자리 알림" className={`switch${on ? ' on' : ''}`}
           onClick={() => run({ type: 'setVacancyAlert', actor: viewer, on: !on }, on ? '빈자리 알림을 껐어요.' : '빈자리가 생기면 알려 드릴게요.')}><span /></button>
       </div>
@@ -40,7 +40,6 @@ export function Achievements({ s, viewer }: { s: State; viewer: string }) {
   return (
     <section className="stack-s">
       <div className="section-title"><h2>업적</h2><span className="mono small muted">{done}/{ACHIEVEMENTS.length}</span></div>
-      <p className="small muted">얻은 업적은 내 정보에서 칭호로 달 수 있어요. 칭호는 같은 실험실 사람에게 닉네임 옆에 보여요.</p>
       <div className="ach-grid">
         {shown.map((a) => {
           const [n, g] = a.goal(c); const ok = n >= g;
@@ -67,7 +66,7 @@ export function TitlePicker({ s, viewer, run }: { s: State; viewer: string; run:
   return (
     <div className="panel" style={{ gap: 8 }}>
       <h3>칭호</h3>
-      {earned.length === 0 ? <p className="small muted">아직 얻은 칭호가 없어요. 첫 분자 카드를 받으면 ‘첫 반응’ 칭호가 생겨요.</p> : (
+      {earned.length === 0 ? <p className="small muted">첫 카드를 받으면 생겨요.</p> : (
         <div className="row" style={{ gap: 6 }}>
           <button className={`chip pick${cur === null ? ' on' : ''}`} aria-pressed={cur === null} onClick={() => run({ type: 'setTitle', actor: viewer, title: null }, '칭호를 뗐어요.')}>달지 않기</button>
           {earned.map((id) => <button key={id} className={`chip pick${cur === id ? ' on' : ''}`} aria-pressed={cur === id} onClick={() => run({ type: 'setTitle', actor: viewer, title: id }, `‘${achievementById(id)!.title}’ 칭호를 달았어요.`)}>{achievementById(id)!.title}</button>)}
@@ -88,7 +87,7 @@ export function ElementStats({ s, viewer }: { s: State & { stats?: ReturnType<ty
   return (
     <div className="stack" style={{ gap: 14 }}>
       <div className="stack-s"><h1>우리 학교 원소 분포</h1>
-        <p className="small muted">원소를 확정한 사람 {st.total}명 기준이에요. 적은 원소일수록 실험실에서 귀한 손님이에요.</p></div>
+        <p className="small muted">{st.total}명 기준</p></div>
       <div className="panel stats" role="list">
         {sorted.map((e) => {
           const n = st.counts[e] ?? 0; const pct = st.total ? Math.round((n / st.total) * 100) : 0; const c = elementColor(e);
@@ -108,10 +107,10 @@ export function ElementStats({ s, viewer }: { s: State & { stats?: ReturnType<ty
 }
 
 const GUIDE = [
-  { t: '나는 원소 하나', d: '테스트로 추천받고 고른 원소가 나를 나타내요. 한 번 정하면 바꿀 수 없어요.', ic: ['H'] },
-  { t: '실험실에 모여 분자 만들기', d: '물(H₂O)이면 수소 둘, 산소 하나. 실험실을 찾아 들어가거나 자동 매칭을 켜 두세요. 빈자리 알림을 켜면 내 자리가 생길 때 알려 줘요.', ic: ['H', 'O', 'H'] },
-  { t: '채팅하고 약속 잡기', d: '방장이 모이는 시각과 장소를 정하면 채팅 위에 고정돼요. 10분 전에 알림이 가요.', ic: ['O'] },
-  { t: '만나서 확인하고 카드 받기', d: '모두 100m 안에서 만남 확인을 누르면 분자 카드를 받아요. 함께한 사람에게 익명 반응도 남겨 주세요.', ic: ['N', 'H', 'H', 'H'] },
+  { t: '나는 원소 하나', d: '고른 원소가 나예요. 정하면 못 바꿔요.', ic: ['H'] },
+  { t: '실험실에 모여 분자 만들기', d: 'H₂O면 수소 둘, 산소 하나. 실험실을 찾거나 자동 매칭해요.', ic: ['H', 'O', 'H'] },
+  { t: '채팅하고 약속 잡기', d: '약속은 채팅 위에 고정되고 10분 전에 알려 줘요.', ic: ['O'] },
+  { t: '만나서 확인하고 카드 받기', d: '모두 100m 안에서 확인하면 카드를 받아요.', ic: ['N', 'H', 'H', 'H'] },
 ] as const;
 
 export function GuideSheet({ onClose }: { onClose: () => void }) {

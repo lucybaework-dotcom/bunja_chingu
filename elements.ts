@@ -169,4 +169,4 @@ export function pairContent(a: ElementId, b: ElementId): PairContent[] {
   return PAIRS[key(a, b)] ?? [];
 }
 
-export const METAPHOR_NOTICE = '원소와 성격의 연결은 분자친구가 만든 비유예요. 성격 진단이나 관계 예측이 아니에요.';
+export const METAPHOR_NOTICE = '원소 성격은 재미를 위한 비유예요.';

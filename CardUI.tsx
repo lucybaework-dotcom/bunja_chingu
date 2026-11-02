@@ -62,7 +62,6 @@ export function MolCard({ id, flipped = false, onFlip, records, live3d = true, t
                   </div>
                 ))}
               </div>
-              <p className="tcard-note">기록에는 만난 날의 원소와 닉네임이 그대로 남아요.</p>
             </div>
           ) : <CardBackPattern />}
         </div>

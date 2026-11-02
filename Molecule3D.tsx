@@ -134,7 +134,7 @@ export default function Molecule3D({ id, height = 200, label, bare }: { id: stri
   return (
     <figure className={`mol3d${bare ? ' bare' : ''}`}>
       <canvas ref={ref} style={{ height }} role="img" aria-label={`${label} 3D 모형. 끌어서 돌려 볼 수 있어요.`} />
-      {!bare && <figcaption className="small muted">{g.note ?? '끌어서 돌려 보세요.'}{g.note ? ' 끌어서 돌려 보세요.' : ''}</figcaption>}
+      {!bare && g.note && <figcaption className="small muted">{g.note}</figcaption>}
     </figure>
   );
 }

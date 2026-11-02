@@ -135,7 +135,7 @@ export default function App({ backend }: { backend: Backend }) {
           </button>
           {onboarded && <NotifBell />}
         </header>
-        {me && me.virtual && <div className="viewer-banner">시연 중: {me.demoLabel} 화면으로 보고 있어요. 시연 도구에서 내 화면으로 돌아갈 수 있어요.</div>}
+        {me && me.virtual && <div className="viewer-banner">시연 중: {me.demoLabel} 화면</div>}
         {body}
       </div>
       {onboarded && <TabBar />}
@@ -230,14 +230,14 @@ function Intro({ onStart }: { onStart: () => void }) {
           <Atom el="O" size={64} /><span className="bond" style={{ width: 22, height: 4, background: 'var(--ink-2)' }} />
           <Atom el="H" size={44} />
         </div>
-        <h1>나를 닮은 원소로,<br />실제 분자만큼 모여 친구가 돼요</h1>
-        <p className="muted">같은 학교 학생들이 원소 하나씩을 맡아 2~6명의 분자를 이뤄요. 서로 다른 성향이 만나 채워 주는 게 이 서비스의 재미예요.</p>
+        <h1>나를 닮은 원소로,<br />분자처럼 모여요</h1>
+        <p className="muted">원소 하나씩 맡아 2~6명이 분자를 만들어요.</p>
       </section>
       <div className="stack">
         {[
-          ['1', '나의 원소 찾기', '테스트로 추천을 받고, 원소 설명을 비교해서 직접 골라요. 한 번 확정하면 바꿀 수 없어요.'],
-          ['2', '실험실에 모이기', '물(H₂O)이라면 수소 두 명과 산소 한 명. 실제 분자의 자리에 맞춰 실험실을 찾거나 자동 매칭해요.'],
-          ['3', '만나고 카드 모으기', '실제로 만난 사람들의 구성이 진짜 분자라면 그 분자 카드를 받아요.'],
+          ['1', '나의 원소 찾기', '추천받고 직접 골라요.'],
+          ['2', '실험실에 모이기', 'H₂O면 수소 둘, 산소 하나.'],
+          ['3', '만나고 카드 모으기', '만나면 분자 카드를 받아요.'],
         ].map(([n, t, d]) => (
           <div key={n} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', gap: 12 }}>
             <span className="mono muted" style={{ fontSize: 13, paddingTop: 2 }}>{n}</span>
@@ -268,19 +268,18 @@ function FindWay({ onAi, onQuiz, onBack }: { onAi: () => void; onQuiz: () => voi
   return (
     <div className="stack" style={{ gap: 16 }}>
       {onBack && <button className="back" onClick={onBack}>← 결과로 돌아가기</button>}
-      <div className="stack-s"><span className="eyebrow">나의 원소 찾기</span><h1>어떻게 찾아볼까요?</h1>
-        <p className="small muted">어느 쪽이든 추천은 참고일 뿐이고, 마지막엔 원소 설명을 비교해서 직접 골라요.</p></div>
+      <div className="stack-s"><span className="eyebrow">나의 원소 찾기</span><h1>어떻게 찾아볼까요?</h1></div>
       <button className="option way" onClick={onAi}>
         <span className="row" style={{ flexWrap: 'nowrap', gap: 12 }}><span className="way-ic" aria-hidden="true"><Professor size={52} mood="happy" /></span>
           <span className="stack-s grow" style={{ gap: 2 }}><strong>벤 교수님과 상담하기 <span className="chip on">추천</span></strong>
-            <span className="small muted">유기화학 연구실의 벤 교수님(AI)이 4~5개를 물어보고, 내 답을 근거로 어울리는 원소 3개를 골라 줘요. 3분쯤 걸려요.</span></span></span>
+            <span className="small muted">AI 교수님이 몇 가지 묻고 원소 3개를 골라 줘요.</span></span></span>
       </button>
       <button className="option way" onClick={onQuiz}>
         <span className="row" style={{ flexWrap: 'nowrap', gap: 12 }}><span className="way-ic" aria-hidden="true">📝</span>
           <span className="stack-s grow" style={{ gap: 2 }}><strong>질문 {QUESTIONS.length}개 고르기</strong>
-            <span className="small muted">보기 중에 고르기만 하면 돼요. 1분이면 끝나요.</span></span></span>
+            <span className="small muted">1분이면 끝나요.</span></span></span>
       </button>
-      <p className="small muted">{backend.mode === 'demo' ? '시연판의 벤 교수님은 실제 AI 대신 정해진 질문과 규칙으로 흉내만 내요.' : '벤 교수님은 AI 캐릭터예요. 상담 대화는 추천을 만들기 위해 Google Gemini로 보내지고, 분자친구 서버에는 저장하지 않아요. 이름·연락처 같은 개인 정보는 적지 마세요.'}</p>
+      <p className="small muted">{backend.mode === 'demo' ? '시연판은 정해진 질문으로 흉내만 내요.' : '대화는 Google Gemini로 보내져요. 개인 정보는 적지 마세요.'}</p>
     </div>
   );
 }
@@ -380,7 +379,6 @@ function Quiz({ onDone, onSkip }: { onDone: (a: Record<string, number>) => void;
         <button className="btn ghost sm" disabled={i === 0} onClick={() => setI(i - 1)}>이전 문항</button>
         {onSkip && <button className="btn ghost sm" onClick={onSkip}>이전 결과로 돌아가기</button>}
       </div>
-      <p className="small muted">친구들과 있을 때의 모습에 가장 큰 비중을 둬요. 결과는 추천일 뿐이고 원소는 직접 고르게 돼요.</p>
     </div>
   );
 }
@@ -394,18 +392,15 @@ function ElementDetail({ el }: { el: ElementId }) {
         <div className="stack-s grow"><h2>{e.name} <span className="mono muted" style={{ fontSize: 16 }}>{e.symbol}</span></h2><p className="small muted">{e.factual}</p></div>
       </div>
       <p>{e.personality}</p>
-      <div className="stack-s"><h3>친구 사이에서</h3><ul className="plain">{e.strengths.map((x) => <li key={x}>{x}</li>)}</ul></div>
-      <div className="stack-s"><h3>어려울 수 있는 점</h3><ul className="plain">{e.difficulties.map((x) => <li key={x}>{x}</li>)}</ul></div>
+      <div className="stack-s"><h3>친구 사이에서</h3><ul className="plain">{e.strengths.slice(0, 2).map((x) => <li key={x}>{x}</li>)}</ul></div>
+      <div className="stack-s"><h3>어려운 점</h3><ul className="plain">{e.difficulties.slice(0, 1).map((x) => <li key={x}>{x}</li>)}</ul></div>
       <div className="stack-s">
         <h3>다른 원소와는</h3>
-        {usableElements().flatMap((o) => pairContent(el, o).map((p, i) => (
-          <div key={`${o}${i}`} className={`pair ${p.kind}`}>
-            <div className="row"><Atom el={o} size={22} /><span className="chip">{p.kind === 'clash' ? '상극' : '보완'}</span><strong>{p.title}</strong></div>
-            <p className="small" style={{ marginTop: 4 }}>{p.body}</p>
-            <p className="small muted">{p.chemistryContext}</p>
-          </div>
-        )))}
-        <p className="small muted">상극 설명은 재미를 위한 세계관이에요. 어떤 원소든 목표 분자에 자리가 있으면 함께할 수 있어요.</p>
+        <div className="row" style={{ gap: 6 }}>
+          {usableElements().flatMap((o) => pairContent(el, o).map((p, i) => (
+            <span key={`${o}${i}`} className="chip pair-chip" title={p.body}><Atom el={o} size={20} />{p.title}</span>
+          )))}
+        </div>
       </div>
     </div>
   );
@@ -435,7 +430,7 @@ function Choose({ onRetake }: { onRetake: () => void }) {
       <div className="stack-s">
         <span className="eyebrow">{isAi ? `${PROF.name} 상담 결과` : '테스트 결과'}</span>
         <h1>추천 원소는 {j(ELEMENTS[last.recommended].name, '이에요/예요')}</h1>
-        <p className="muted small">다른 원소 설명도 비교해 보고 직접 골라 주세요. 추천과 달라도 괜찮아요.</p>
+        <p className="muted small">추천과 달라도 괜찮아요.</p>
       </div>
       <div className="el-tabs" role="tablist">
         {ranking.map((el) => (
@@ -454,10 +449,10 @@ function Choose({ onRetake }: { onRetake: () => void }) {
       ) : (
         <div className="panel warn">
           <h2>{j(ELEMENTS[sel].name, '을/를')} 내 원소로 확정할까요?</h2>
-          <p className="small">확정하면 계정을 유지하는 동안 원소를 바꿀 수 없어요. 바꾸려면 탈퇴 후 다시 가입해야 해요.</p>
+          <p className="small">확정하면 바꿀 수 없어요.</p>
           <NicknameInput id="nick-in" value={nick} onChange={setNick} />
           <label className="stack-s" htmlFor="intro-in">
-            <span className="small" style={{ fontWeight: 600 }}>한 줄 소개 (실험실 목록에서 원소와 함께 보여요)</span>
+            <span className="small" style={{ fontWeight: 600 }}>한 줄 소개</span>
             <input id="intro-in" className="input" maxLength={INTRO_MAX} value={intro} onChange={(e) => setIntro(e.target.value)} placeholder="예: 조용한 카페에서 수다 떠는 거 좋아해요" />
             <span className="small muted mono">{intro.length}/{INTRO_MAX}</span>
           </label>
@@ -481,7 +476,6 @@ function Home() {
   const commit = recruitingCommitments(s, viewer);
   const conflict = hasConflict(s, viewer);
   const myRooms = Object.values(s.rooms).filter((r) => isMember(s, r.id, viewer)).sort((a, b) => b.createdAt - a.createdAt);
-  const pastRooms = Object.values(s.rooms).filter((r) => !isMember(s, r.id, viewer) && s.members.some((m) => m.roomId === r.id && m.userId === viewer) && r.closedAt);
   const busy = commit.rooms.length > 0 || commit.queued || !!me.suspendedAt || !me.nickname;
   const { pending } = myCards(s, viewer);
   const [nick, setNick] = useState('');
@@ -504,12 +498,12 @@ function Home() {
       {!me.nickname && (
         <form className="panel warn" onSubmit={async (e) => { e.preventDefault(); await run({ type: 'updateProfile', actor: viewer, nickname: nick }, '닉네임을 정했어요.'); }}>
           <h3>닉네임을 정해 주세요</h3>
-          <p className="small">같은 실험실 사람들에게 보이는 이름이에요. 정해야 실험실에 들어갈 수 있어요.</p>
+          <p className="small">실험실에서 보이는 이름이에요.</p>
           <NicknameInput id="home-nick" value={nick} onChange={setNick} />
           <button className="btn primary" disabled={nick.trim().length < 2}>정하기</button>
         </form>
       )}
-      {me.suspendedAt && <div className="panel warn"><h3>이용이 잠시 정지됐어요</h3><p className="small">신고가 쌓여 관리자가 확인하는 중이에요. 확인이 끝나면 알림으로 알려 드려요.</p></div>}
+      {me.suspendedAt && <div className="panel warn"><h3>이용이 잠시 정지됐어요</h3><p className="small">관리자가 확인 중이에요.</p></div>}
       {pending.length > 0 && (
         <button className="panel claim-banner" onClick={() => openReveal(pending[0].id)}>
           <span className="claim-pack" aria-hidden="true" />
@@ -519,7 +513,7 @@ function Home() {
       {conflict && (
         <div className="panel warn">
           <h3>모집 중인 실험실이 두 곳 겹쳐 있어요</h3>
-          <p className="small">첫 만남 전에 다시 모집을 시작한 실험실이 있어요. 모집 중인 실험실은 한 곳만 남길 수 있어요. 남길 실험실을 골라 주세요. 고르지 않은 실험실에서는 나가게 돼요.</p>
+          <p className="small">모집 중인 실험실은 하나만 남길 수 있어요.</p>
           {commit.rooms.map((rid) => (
             <button key={rid} className="btn block" onClick={() => run({ type: 'resolveConflict', actor: viewer, keepRoomId: rid }, '한 곳만 남겼어요.')}>‘{roomTitle(s.rooms[rid])}’에 남기</button>
           ))}
@@ -533,13 +527,12 @@ function Home() {
         </div>
         <button className="btn ghost block" onClick={() => go({ k: 'stats' })}>우리 학교 원소 분포 보기</button>
         {commit.queued && <button className="btn ghost block" onClick={() => go({ k: 'auto' })}>자동 매칭 대기 중 · 상태 보기</button>}
-        {!commit.queued && commit.rooms.length > 0 && !conflict && <p className="small muted">모집 중인 실험실이 있어서 새 모집에 참여할 수 없어요. 모집 중인 실험실은 한 곳만 참여할 수 있어요.</p>}
+        {!commit.queued && commit.rooms.length > 0 && !conflict && <p className="small muted">모집 중인 실험실은 한 곳만 참여할 수 있어요.</p>}
       </div>
       <section className="stack">
         <div className="section-title"><h2>참여 중인 실험실</h2><span className="mono small muted">{myRooms.length}</span></div>
-        {myRooms.length === 0 && <div className="panel flat"><p className="muted small">아직 들어간 실험실이 없어요. 자동 매칭을 시작하거나 실험실을 찾아보세요.</p></div>}
+        {myRooms.length === 0 && <div className="panel flat"><p className="muted small">아직 없어요.</p></div>}
         {myRooms.map((r) => <RoomCard key={r.id} room={r} compact />)}
-        {pastRooms.length > 0 && <p className="small muted">종료됐거나 나온 실험실 {pastRooms.length}곳은 내 정보에서 볼 수 있어요.</p>}
       </section>
       <button className="btn ghost block" onClick={() => go({ k: 'collection' })}>내 분자 도감 · {myCards(s, viewer).owned.size}/{USABLE().length}</button>
     </div>
@@ -618,7 +611,7 @@ function RoomsList() {
         {[2, 3, 4, 5, 6].map((n) => <button key={n} className={`chip pick${size === n ? ' on' : ''}`} aria-pressed={size === n} onClick={() => setSize(size === n ? 0 : n)}>{n}명</button>)}
       </div>
       {list.length === 0 && filtered && <div className="panel flat"><p className="small muted">조건에 맞는 실험실이 없어요.</p><button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => { setToday(false); setSize(0); }}>필터 지우기</button></div>}
-      {list.length === 0 && !filtered && <div className="panel flat"><p className="small muted">지금은 {tab === 'mine' ? `${ELEMENTS[el].name} 자리가 남은 실험실이 없어요. 새 실험실을 만들거나 자동 매칭으로 기다려 보세요.` : '모집 중인 실험실이 없어요.'}</p></div>}
+      {list.length === 0 && !filtered && <div className="panel flat"><p className="small muted">지금은 {tab === 'mine' ? `${ELEMENTS[el].name} 자리가 남은 실험실이 없어요.` : '모집 중인 실험실이 없어요.'}</p></div>}
       {list.map((r) => <RoomCard key={r.id} room={r} />)}
     </div>
   );
@@ -649,8 +642,6 @@ function CreateRoom() {
         <input id="room-when" className="input" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
       </section>
       <h2>어떤 분자를 만들까요?</h2>
-      <p className="small muted">이온 결정은 결정 속 화학식 단위의 원자 수만큼 모여요. 예를 들어 소금 NaCl은 2명이에요.</p>
-      <p className="small muted">{j(ELEMENTS[el].name, '이/가')} 들어갈 수 있는 분자만 보여요. 나는 방장으로 원자 한 자리를 차지해요.</p>
       {groups.map((n) => (
         <section key={n} className="stack-s">
           <span className="eyebrow">{n}명</span>
@@ -691,7 +682,7 @@ function CreateRoom() {
 
 // ───────── 7. 자동 매칭 대기 ─────────
 function AutoMatch() {
-  const { s, viewer, run, go, backend } = useApp();
+  const { s, viewer, run, go } = useApp();
   const q = waitingEntry(s, viewer);
   const last = s.queue.filter((x) => x.userId === viewer).at(-1);
   const el = s.users[viewer].elementId!;
@@ -709,10 +700,9 @@ function AutoMatch() {
     <div className="stack" style={{ gap: 20, alignItems: 'center', textAlign: 'center', paddingTop: 24 }}>
       <span className="pulse"><Atom el={el} size={88} /></span>
       <h1>결합할 원자를 찾는 중</h1>
-      <p className="muted">{ELEMENTS[el].name} 자리가 있는 모집 중인 실험실이 아직 없어서 대기열에 들어갔어요. 함께 기다리는 사람들로 실제 분자가 만들어지면 바로 실험실이 열리고 알려 드려요.</p>
+      <p className="muted">{ELEMENTS[el].name} 자리가 맞는 분자가 모이면 알려 드려요.</p>
       <div className="row small muted" style={{ justifyContent: 'center' }}><span className="mono">대기 {waiting}명</span><span>·</span><span>{fmtTime(q.enteredAt)}부터</span></div>
       <button className="btn danger" onClick={async () => { const r = await run({ type: 'cancelAutoMatch', actor: viewer }, '매칭을 취소했어요.'); if (r.ok) go({ k: 'home' }); }}>매칭 취소</button>
-      {backend.mode === 'demo' && <p className="small muted">시연 도구에서 가상 사용자를 대기열에 넣어 매칭을 확인할 수 있어요.</p>}
     </div>
   );
 }
@@ -794,7 +784,7 @@ function RoomDetail({ id }: { id: string }) {
             : <p className="small muted">이 실험실에는 {ELEMENTS[me.elementId!].name} 자리가 없어요.</p>
         )}
         {!member && isRecruitingOpen(r) && (blocked.rooms.length > 0 || blocked.queued) && (vac[me.elementId!] ?? 0) > 0 && (
-          <p className="small muted">{blocked.queued ? '자동 매칭 대기 중이라 직접 합류할 수 없어요.' : '이미 다른 모집 중인 실험실에 있어요. 모집 중인 실험실은 한 곳만 참여할 수 있어요.'}</p>
+          <p className="small muted">{blocked.queued ? '자동 매칭 대기 중이라 직접 합류할 수 없어요.' : '이미 다른 실험실에서 모집 중이에요.'}</p>
         )}
       </div>
 
@@ -813,8 +803,8 @@ function RoomDetail({ id }: { id: string }) {
           {confirmLeave !== '' && (
             <div className="panel warn">
               <p className="small">{confirmLeave === 'leave'
-                ? (r.firstMeetingConfirmedAt ? '나가도 남은 사람들의 실험실은 그대로 유지돼요.' : r.recruitment === 'complete' ? '첫 만남 전이라 내가 나가면 이 실험실은 빈자리를 다시 모집해요.' : '나가면 내 자리가 빈자리로 돌아가요.')
-                : '실험실을 종료하면 채팅과 모집이 모두 끝나요. 이미 얻은 카드와 만남 기록은 그대로 남아요.'}</p>
+                ? (r.firstMeetingConfirmedAt ? '나가도 남은 사람들의 실험실은 그대로 유지돼요.' : r.recruitment === 'complete' ? '내 자리는 다시 모집돼요.' : '나가면 내 자리가 빈자리로 돌아가요.')
+                : '채팅과 모집이 끝나요. 카드는 남아요.'}</p>
               <div className="row">
                 <button className="btn ghost" onClick={() => setConfirmLeave('')}>취소</button>
                 <button className="btn danger grow" onClick={async () => {
@@ -846,7 +836,7 @@ function Proposals({ room }: { room: Room }) {
           <h2>{p.type === 'earlyComplete' ? '반응을 종결시키겠습니까?' : '목표 분자를 바꿀까요?'}</h2>
           <p className="small">{p.type === 'earlyComplete'
             ? `지금 모인 구성 그대로 ${j(molName(p.targetMoleculeId), '으로/로')} 확정해요.`
-            : `목표를 ${j(molName(p.targetMoleculeId), '으로/로')} 바꾸고 남은 자리를 더 모집해요. 지금 있는 사람은 아무도 빠지지 않아요.`}
+            : `목표를 ${j(molName(p.targetMoleculeId), '으로/로')} 바꾸고 남은 자리를 더 모집해요.`}
             {p.reason === 'deadline' && ' 한 명이라도 반대하면 실험실이 종료돼요.'}</p>
           <div className="stack-s">
             {p.electorate.map((uid) => {
@@ -907,15 +897,14 @@ function MeetingPanel({ room }: { room: Room }) {
       {pm && !picking ? (
         <>
           <h3>실제 참석 확인</h3>
-          <p className="small">{pm.matchedMoleculeId ? <>참석 구성이 <strong>{molName(pm.matchedMoleculeId)}</strong>{josaOf(molName(pm.matchedMoleculeId), '이에요/예요')}. 모두 확인하면 이 카드를 받아요.</> : '참석 구성이 유효한 분자가 아니에요. 모두 확인하면 카드 없이 만남 기록만 남아요.'}</p>
+          <p className="small">{pm.matchedMoleculeId ? <>참석 구성이 <strong>{molName(pm.matchedMoleculeId)}</strong>{josaOf(molName(pm.matchedMoleculeId), '이에요/예요')}. 모두 확인하면 이 카드를 받아요.</> : '유효한 분자가 아니라 기록만 남아요.'}</p>
           <div className="stack-s">
             {pm.attendees.map((a) => {
               const c = pm.confirmations[a.userId];
               return <div key={a.userId} className="row small"><Atom el={a.element} size={20} /><span className="grow">{a.userId === viewer ? '나' : nickOf(s, viewer, a.userId) || a.intro}</span><span className={`chip ${c === 'confirmed' ? 'ok' : ''}`}>{c === 'confirmed' ? '확인함' : '확인 대기'}</span></div>;
             })}
           </div>
-          {mems.filter((m) => !pm.attendees.some((a) => a.userId === m.userId)).length > 0 && <p className="small muted">불참으로 표시된 분은 확인하지 않아도 되고 카드도 받지 않아요.</p>}
-          {s.config.meetingProximity.required && <p className="small muted">참석자 모두 {s.config.meetingProximity.radiusM}m 안에서, 첫 확인 후 2시간 안에 눌러야 해요. 누를 때 위치를 한 번 확인하고, 만남이 확정되면 위치는 지워요.</p>}
+          {s.config.meetingProximity.required && <p className="small muted">참석자 모두 {s.config.meetingProximity.radiusM}m 안에서 눌러야 해요.</p>}
           {pm.attendees.some((a) => a.userId === viewer) && !pm.confirmations[viewer] && (
             <div className="row">
               <button className="btn grow" onClick={() => run({ type: 'respondMeeting', actor: viewer, meetingId: pm.id, response: 'reject' }, '방장에게 수정을 요청했어요.')}>목록이 달라요</button>
@@ -932,7 +921,7 @@ function MeetingPanel({ room }: { room: Room }) {
         </>
       ) : isHost && (!pm || picking) ? (
         <>
-          {last?.status === 'rejected' && !picking && <p className="small" style={{ color: 'var(--warn)' }}>참석자 한 명이 목록이 다르다고 했어요. 실제 참석자를 다시 골라 주세요.</p>}
+          {last?.status === 'rejected' && !picking && <p className="small" style={{ color: 'var(--warn)' }}>참석자를 다시 골라 주세요.</p>}
           <h3>만난 뒤, 실제로 온 사람을 골라 주세요</h3>
           <div className="stack-s">
             {mems.map((mm) => (
@@ -949,7 +938,7 @@ function MeetingPanel({ room }: { room: Room }) {
           </div>
         </>
       ) : (
-        <p className="small muted">{last?.status === 'rejected' ? '방장이 참석자 목록을 수정하는 중이에요.' : '만남 뒤 방장이 실제 참석자를 고르면 여기서 확인할 수 있어요. 날짜와 장소는 채팅에서 정해 주세요.'}</p>
+        <p className="small muted">{last?.status === 'rejected' ? '방장이 참석자 목록을 수정하는 중이에요.' : '만난 뒤 방장이 참석자를 고르면 확인할 수 있어요.'}</p>
       )}
     </div>
   );
@@ -1063,7 +1052,6 @@ function Collection() {
       <div className="panel" style={{ gap: 8 }}>
         <div className="row between"><strong>{owned.size} / {all.length}종 모음</strong><span className="mono small muted">{pct}%</span></div>
         <div className="meter"><div style={{ width: `${pct}%` }} /></div>
-        <p className="small muted">실제로 만난 사람들의 원소 구성이 그 분자와 같으면 카드가 열려요. {ELEMENTS[myEl].name} 자리가 있는 분자는 “내 자리 있음”으로 표시돼요.</p>
       </div>
       {pending.length > 0 && (
         <button className="panel claim-banner" onClick={() => openReveal(pending[0].id)}>
@@ -1091,7 +1079,7 @@ function Collection() {
         </>
       )}
       {tab === 'nocard' && (nocard.length === 0
-        ? <div className="panel flat"><p className="small muted">참석 구성이 유효한 분자가 아니었던 만남이 여기 남아요.</p></div>
+        ? <div className="panel flat"><p className="small muted">카드 없이 남은 만남이 없어요.</p></div>
         : nocard.map((r) => <RecordRow key={r.id} recId={r.id} />))}
       <Achievements s={s} viewer={viewer} />
     </div>
@@ -1162,7 +1150,7 @@ function PublicPreview() {
     <div className="stack">
       <button className="back" onClick={() => go({ k: 'collection' })}>← 도감</button>
       <h1>다른 학생에게 보이는 화면</h1>
-      <p className="small muted">공개로 설정한 카드와 기록만 보여요. 함께한 사람의 한 줄 소개는 그 사람의 동의 정책이 정해지기 전까지 보이지 않고, 원소만 보여요.</p>
+      <p className="small muted">공개한 카드와 기록만 보여요.</p>
       <div className="panel" style={{ flexDirection: 'row', alignItems: 'center' }}><Atom el={me.elementId!} size={44} /><div className="grow"><strong>{me.nickname || ELEMENTS[me.elementId!].name}</strong><p className="small">{me.intro}</p></div></div>
       {cards.length === 0 && recs.length === 0 && <div className="panel flat"><p className="small muted">공개한 카드나 기록이 없어요.</p></div>}
       {cards.length > 0 && <div className="dex-grid">{cards.map((c) => <DexTile key={c.moleculeId} id={c.moleculeId} owned pending={false} mineFits={false} />)}</div>}
@@ -1195,12 +1183,12 @@ function Profile() {
         <Atom el={me.elementId!} size={56} />
         <div className="stack-s grow">
           <h2>{ELEMENTS[me.elementId!].name}</h2>
-          <p className="small muted">{fmtDate(me.elementLockedAt!)} 확정 · 원소는 바꿀 수 없어요. 바꾸려면 탈퇴 후 다시 가입해야 해요.</p>
+          <p className="small muted">{fmtDate(me.elementLockedAt!)} 확정</p>
           <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => go({ k: 'table', el: me.elementId! })}>주기율표에서 보기</button>
         </div>
       </div>
       <TitlePicker s={s} viewer={viewer} run={run} />
-      {mine && <div className="panel"><ReactionMeter score={mine.reaction.score} reviews={mine.reaction.reviews} /><button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => openProfile(viewer)}>다른 사람에게 보이는 내 프로필</button></div>}
+      {mine && <div className="panel"><ReactionMeter score={mine.reaction.score} reviews={mine.reaction.reviews} /><button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => openProfile(viewer)}>내 프로필 보기</button></div>}
       <form className="panel" onSubmit={(e) => { e.preventDefault(); run({ type: 'updateProfile', actor: viewer, nickname: nick, tags }, '프로필을 저장했어요.'); }}>
         <NicknameInput id="nick-edit" value={nick} onChange={setNick} />
         <TagPicker value={tags} onChange={setTags} />
@@ -1210,7 +1198,6 @@ function Profile() {
         <label htmlFor="intro-edit"><h3>한 줄 소개</h3></label>
         <input id="intro-edit" className="input" maxLength={INTRO_MAX} value={intro} onChange={(e) => setIntro(e.target.value)} />
         <div className="row between"><span className="small muted mono">{intro.length}/{INTRO_MAX}</span><button className="btn primary sm" disabled={intro.trim() === me.intro || !intro.trim()}>저장</button></div>
-        <p className="small muted">이미 남은 만남 기록에는 그때의 소개가 유지돼요.</p>
       </form>
       <section className="stack-s">
         <h2>참여한 실험실</h2>
@@ -1233,7 +1220,6 @@ function Profile() {
         </section>
       )}
       {isAdminView(s, viewer) && <button className="btn block" onClick={() => go({ k: 'admin' })}>관리자 화면 · 처리 전 신고 {s.reports.filter((r) => r.status === 'open').length}</button>}
-      <p className="small muted">{METAPHOR_NOTICE}</p>
       <section className="stack-s">
         <h2>앱과 알림</h2>
         <VacancyToggle s={s} viewer={viewer} run={run} />
@@ -1269,7 +1255,7 @@ function RoomInfoEditor({ room }: { room: Room }) {
       const r = await run({ type: 'renameRoom', actor: viewer, roomId: room.id, name, meetAt: when ? new Date(when).getTime() : null }, '실험실 정보를 바꿨어요.');
       if (r.ok) setOpen(false);
     }}>
-      {!room.name && <p className="small"><strong>실험실 이름을 정해 주세요.</strong> 자동 매칭으로 만들어진 실험실이라 아직 이름이 없어요. 방장이 정할 수 있어요.</p>}
+      {!room.name && <p className="small"><strong>실험실 이름을 정해 주세요.</strong></p>}
       <label className="stack-s" htmlFor={`rn-${room.id}`}><span className="small" style={{ fontWeight: 600 }}>실험실 이름</span>
         <input id={`rn-${room.id}`} className="input" maxLength={ROOM_NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 2시에 밥 먹을 사람" /></label>
       <label className="stack-s" htmlFor={`rw-${room.id}`}><span className="small" style={{ fontWeight: 600 }}>모이는 시각 (선택)</span>
@@ -1298,7 +1284,7 @@ function ClaimPanel({ room }: { room: Room }) {
       ) : (
         <>
           <h3>첫 만남이 확인됐어요</h3>
-          <p className="small">참석 구성이 유효한 분자가 아니어서 카드 대신 만남 기록이 남았어요.</p>
+          <p className="small">카드 대신 만남 기록이 남았어요.</p>
           <button className="btn block" onClick={() => run({ type: 'claimCard', actor: viewer, recordId: rec.id }, '만남 기록을 받았어요.')}>만남 기록 받기</button>
         </>
       )) : <p className="small">{rec.moleculeId ? `${molName(rec.moleculeId)} 카드를 받았어요.` : '만남 기록을 받았어요.'}</p>}
@@ -1318,7 +1304,7 @@ function LocationShare() {
         <span className="stack-s grow" style={{ gap: 0 }}><strong>내 위치를 캠퍼스 지도에 보여 주기</strong><span className="small muted">캠퍼스 안에 있는 모든 사용자가 볼 수 있어요</span></span>
         <button role="switch" aria-checked={on} className={`switch${on ? ' on' : ''}`} onClick={() => run({ type: 'setSharing', actor: viewer, on: !on }, on ? '위치 공유를 껐어요.' : '위치 공유를 켰어요.')}><span /></button>
       </div>
-      {on && <p className="small muted">{loc ? `마지막 위치 ${fmtTime(loc.at)} · ` : '위치를 찾는 중 · '}캠퍼스를 벗어나거나 첫 만남이 확인되면 자동으로 꺼져요. 위치 기록은 남기지 않고 마지막 위치 하나만 보여요.</p>}
+      {on && <p className="small muted">{loc ? `마지막 위치 ${fmtTime(loc.at)} · ` : '위치를 찾는 중 · '}캠퍼스를 벗어나면 꺼져요.</p>}
     </div>
   );
 }
@@ -1379,7 +1365,7 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
     <div className="sheet-bg" onClick={onClose}>
       <div className="sheet" role="dialog" aria-label="시연 도구" onClick={(e) => e.stopPropagation()}>
         <div className="row between"><h2>시연 도구</h2><button className="btn sm" onClick={onClose}>닫기</button></div>
-        <p className="small muted">서버 없이 이 기기에서만 동작하는 시연이에요. 다른 사람은 모두 가상 사용자이고, 아래 버튼은 각 가상 사용자 본인 자격으로 행동해요.</p>
+        <p className="small muted">이 기기에서만 도는 시연이에요. 다른 사람은 가상 사용자예요.</p>
 
         <div className="panel">
           <label htmlFor="viewer-sel"><h3>누구의 화면으로 볼까요</h3></label>
@@ -1408,7 +1394,7 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
         {isDemoGeo() && (
           <div className="panel">
             <h3>내 위치 흉내 내기</h3>
-            <p className="small muted">시연판은 진짜 GPS 대신 이 위치를 써요. 만남 확인과 주변 원자 찾기에 쓰여요.</p>
+            <p className="small muted">GPS 대신 이 위치를 써요.</p>
             <div className="seg">
               <button className={sim === 'campus' ? 'on' : ''} onClick={() => { setSimulated('campus'); setSim('campus'); }}>캠퍼스 안</button>
               <button className={sim === 'away' ? 'on' : ''} onClick={() => { setSimulated('away'); setSim('away'); }}>캠퍼스 밖</button>
@@ -1453,7 +1439,7 @@ function PeriodicTable({ initial }: { initial?: string }) {
     <div className="stack" style={{ gap: 16 }}>
       <div className="stack-s">
         <div className="row between"><h1>주기율표</h1><button className="btn sm" onClick={() => go({ k: 'stats' })}>학교 원소 분포</button></div>
-        <p className="small muted">원소를 눌러 성격 비유와 잘 맞는 원소를 볼 수 있어요. 색이 있는 칸이 지금 분자친구에서 고를 수 있는 원소예요.</p>
+        <p className="small muted">원소를 눌러 성격을 볼 수 있어요.</p>
       </div>
       <div className="pt-wrap">
         <div className="pt" role="grid" aria-label="주기율표 1~4주기 (전형 원소)">
@@ -1502,7 +1488,6 @@ function PeriodicTable({ initial }: { initial?: string }) {
             <span className="pt-cell big" aria-hidden="true" style={{ ['--t' as string]: elementColor(cell.symbol).tint }}><span className="pt-z mono">{cell.z}</span><span className="pt-sym mono">{cell.symbol}</span></span>
             <div className="stack-s grow"><h2>{cell.name}</h2><p className="small">{cell.note}</p></div>
           </div>
-          <p className="small muted">원소 목록은 실제 분자 카탈로그가 검토되면서 늘어날 수 있어요.</p>
         </div>
       )}
     </div>

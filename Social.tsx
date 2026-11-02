@@ -24,7 +24,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
 
 /** 반응도 막대 */
 export function ReactionMeter({ score, reviews }: { score: number | null; reviews: number }) {
-  if (score === null) return <p className="small muted">반응도 측정 중 · 반응 {reviews}/{REACTION.minReviewsToShow}개 모이면 공개돼요</p>;
+  if (score === null) return <p className="small muted">반응도 측정 중 ({reviews}/{REACTION.minReviewsToShow})</p>;
   const level = score >= 70 ? '아주 활발해요' : score >= 55 ? '활발해요' : score >= 45 ? '보통이에요' : '조심스러워요';
   return (
     <div className="stack-s" style={{ gap: 4 }}>
@@ -37,7 +37,7 @@ export function ReactionMeter({ score, reviews }: { score: number | null; review
 export function TagPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
   return (
     <div className="stack-s">
-      <span className="small muted">관심사 (최대 {TAGS_MAX}개, 선택)</span>
+      <span className="small muted">관심사 (최대 {TAGS_MAX}개)</span>
       <div className="row" style={{ gap: 6 }}>
         {INTEREST_TAGS.map((t) => {
           const on = value.includes(t);
@@ -52,7 +52,7 @@ export function TagPicker({ value, onChange }: { value: string[]; onChange: (v: 
 export function NicknameInput({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
   return (
     <label className="stack-s" htmlFor={id}>
-      <span className="small" style={{ fontWeight: 600 }}>닉네임 (2~{NICK_MAX}자, 같은 실험실 사람에게 보여요)</span>
+      <span className="small" style={{ fontWeight: 600 }}>닉네임 (2~{NICK_MAX}자)</span>
       <input id={id} className="input" maxLength={NICK_MAX} value={value} onChange={(e) => onChange(e.target.value)} placeholder="예: 수소방울" autoComplete="nickname" />
     </label>
   );
@@ -62,7 +62,7 @@ export function ProfileSheet({ s, viewer, uid, run, onClose, roomId }: { s: Stat
   const p = getProfile(s, viewer, uid);
   const [mode, setMode] = useState<'view' | 'report' | 'block'>('view');
   const blocked = s.blocks.some((b) => b.from === viewer && b.to === uid);
-  if (!p) return <Sheet title="프로필" onClose={onClose}><p className="small muted">같은 실험실이 열려 있는 동안에만 프로필을 볼 수 있어요.</p></Sheet>;
+  if (!p) return <Sheet title="프로필" onClose={onClose}><p className="small muted">같은 실험실에 있을 때만 볼 수 있어요.</p></Sheet>;
   const me = uid === viewer;
   return (
     <Sheet title={me ? '내 프로필' : `${p.nickname || '이름 없음'}님`} onClose={onClose}>
@@ -105,7 +105,7 @@ export function ProfileSheet({ s, viewer, uid, run, onClose, roomId }: { s: Stat
       {mode === 'report' && <ReportForm run={run} viewer={viewer} target={uid} roomId={roomId} name={p.nickname} onDone={() => setMode('view')} />}
       {mode === 'block' && (
         <div className="panel warn">
-          <p className="small">차단하면 {p.nickname}님과 같은 실험실에 들어갈 수 없고, 자동 매칭에서도 서로 묶이지 않아요. 차단 사실은 상대에게 알리지 않아요. 지금 함께 있는 실험실에서는 나가지 않아요.</p>
+          <p className="small">차단하면 {p.nickname}님과 다시 묶이지 않아요. 상대는 몰라요.</p>
           <div className="row"><button className="btn ghost" onClick={() => setMode('view')}>취소</button>
             <button className="btn danger grow" onClick={async () => { const r = await run({ type: 'block', actor: viewer, target: uid }, '차단했어요.'); if (r.ok) setMode('view'); }}>차단하기</button></div>
         </div>
@@ -126,7 +126,7 @@ export function ReportForm({ run, viewer, target, roomId, name, onDone, messageI
       if (r.ok) onDone();
     }}>
       {quote !== undefined && <blockquote className="quote small">“{quote}”</blockquote>}
-      <p className="small">{quote !== undefined ? `${name}님의 이 메시지를` : `${name}님을`} 신고하는 이유를 골라 주세요. 신고한 메시지 내용은 관리자에게 함께 전달돼요. 신고한 사실은 상대에게 알리지 않아요. 서로 다른 세 명에게 신고되면 관리자가 확인할 때까지 이용이 정지돼요.</p>
+      <p className="small">{quote !== undefined ? `${name}님의 이 메시지를` : `${name}님을`} 신고하는 이유를 골라 주세요. 상대는 몰라요.</p>
       <div className="stack-s" role="radiogroup">
         {REPORT_REASONS.map((r) => (
           <label key={r.id} className="check" htmlFor={`rr-${r.id}`}><input id={`rr-${r.id}`} type="radio" name="reason" checked={reason === r.id} onChange={() => setReason(r.id)} /><span>{r.label}</span></label>
@@ -150,7 +150,7 @@ export function ReviewSheet({ s, viewer, meetingId, run, onClose }: { s: State; 
   const name = (uid: string) => getProfile(s, viewer, uid)?.nickname || '함께한 친구';
   return (
     <Sheet title="반응 남기기" onClose={onClose}>
-      <p className="small muted">누가 남겼는지는 알 수 없어요. 반응이 {REACTION.minReviewsToShow}개 이상 모여야 상대의 반응도가 공개돼요. 불편한 일이 있었다면 반응 대신 프로필에서 신고해 주세요.</p>
+      <p className="small muted">익명이에요.</p>
       <div className="stack-s">
         {others.map((o) => (
           <button key={o.userId} type="button" className={`option${cur === o.userId ? ' sel' : ''}`} disabled={done(o.userId)} onClick={() => { setCur(o.userId); setTags([]); }}>
