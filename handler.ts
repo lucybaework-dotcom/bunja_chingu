@@ -29,7 +29,7 @@ export function pushesFor(before: State, after: State, actor: string): { uid: st
   const out: { uid: string; data: PushData }[] = [];
   const old = new Set(before.notifications.map((n) => n.id));
   for (const n of after.notifications) if (!old.has(n.id) && after.pushSubs[n.userId]?.length)
-    out.push({ uid: n.userId, data: { title: '분자친구', body: n.text, url: n.roomId ? `./#room-${n.roomId}` : './', tag: n.roomId ?? 'bunja' } });
+    out.push({ uid: n.userId, data: { title: '몰링크', body: n.text, url: n.roomId ? `./#room-${n.roomId}` : './', tag: n.roomId ?? 'bunja' } });
   const oldMsg = new Set(before.messages.map((m) => m.id));
   for (const m of after.messages) {
     if (oldMsg.has(m.id) || !m.senderId) continue;

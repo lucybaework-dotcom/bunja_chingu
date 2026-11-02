@@ -93,7 +93,7 @@ function Login({ notice }: { notice?: string }) {
           <Atom el="O" size={56} /><span className="bond" style={{ width: 20, height: 4, background: 'var(--ink-2)' }} />
           <Atom el="H" size={40} />
         </div>
-        <h1>분자친구</h1>
+        <h1>몰링크</h1>
         <p className="muted">나를 닮은 원소로, 실제 분자만큼 모여 친구가 돼요.</p>
       </section>
       {notice && !msg && <div className="panel warn"><p className="small">{notice}</p></div>}

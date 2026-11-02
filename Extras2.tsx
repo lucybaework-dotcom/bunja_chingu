@@ -118,7 +118,7 @@ export function GuideSheet({ onClose }: { onClose: () => void }) {
   const g = GUIDE[i]; const last = i === GUIDE.length - 1;
   return (
     <div className="sheet-bg" onClick={onClose}>
-      <div className="sheet guide" role="dialog" aria-label="분자친구 사용 안내" onClick={(e) => e.stopPropagation()}>
+      <div className="sheet guide" role="dialog" aria-label="몰링크 사용 안내" onClick={(e) => e.stopPropagation()}>
         <div className="row between"><span className="mono small muted">{i + 1} / {GUIDE.length}</span><button className="btn sm ghost" onClick={onClose}>건너뛰기</button></div>
         <div className="guide-art" key={i} aria-hidden="true">{g.ic.map((e, k) => <Atom key={k} el={e as ElementId} size={k === 1 && g.ic.length === 3 ? 60 : 46} />)}</div>
         <h2>{g.t}</h2>

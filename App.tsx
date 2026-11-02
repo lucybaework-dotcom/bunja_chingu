@@ -131,7 +131,7 @@ export default function App({ backend }: { backend: Backend }) {
         <header className="topbar">
           <button className="brand" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => go({ k: 'home' })}>
             <span className="brand-mark" aria-hidden="true"><Atom el="H" size={20} /><span className="bond" style={{ width: 8, height: 3, background: 'var(--ink-2)', display: 'inline-block' }} /><Atom el="O" size={24} /></span>
-            분자친구
+            몰링크
           </button>
           {onboarded && <NotifBell />}
         </header>
