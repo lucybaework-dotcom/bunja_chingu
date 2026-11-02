@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import { LocalBackend } from './backend';
 import App from './App';
 import AuthGate from './Auth';
+import UpdateBar from './UpdateBar';
 import { setupPwa } from './pwa';
 import './styles.css';
 
@@ -9,4 +10,4 @@ import './styles.css';
 const demo = import.meta.env.MODE === 'demo' || location.hash === '#demo';
 if (!demo) setupPwa();
 const root = createRoot(document.getElementById('root')!);
-root.render(demo ? <App backend={new LocalBackend()} /> : <AuthGate />);
+root.render(demo ? <App backend={new LocalBackend()} /> : <><UpdateBar /><AuthGate /></>);

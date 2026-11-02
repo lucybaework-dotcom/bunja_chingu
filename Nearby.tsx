@@ -39,7 +39,7 @@ export default function Nearby({ s, viewer, now, onOpenRoom, refresh }: { s: Sta
     if (!mapEl.current || mapRef.current) return;
     const map = L.map(mapEl.current, { zoomControl: true, attributionControl: true }).setView([CAMPUS.center.lat, CAMPUS.center.lng], 17);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
-    const poly = L.polygon(CAMPUS.polygon, { color: '#0f6e78', weight: 2, fillOpacity: 0.06, dashArray: '6 6' }).addTo(map).bindTooltip(CAMPUS.name);
+    const poly = L.polygon(CAMPUS.polygon, { color: '#1b74b8', weight: 2, fillOpacity: 0.06, dashArray: '6 6' }).addTo(map).bindTooltip(CAMPUS.name);
     map.fitBounds(poly.getBounds(), { padding: [12, 12] });
     layer.current = L.layerGroup().addTo(map);
     mapRef.current = map;

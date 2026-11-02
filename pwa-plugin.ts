@@ -5,7 +5,7 @@ import { ICONS } from './pwa-icons';
 const MANIFEST = {
   name: '분자친구', short_name: '분자친구', description: '나를 닮은 원소로, 실제 분자만큼 모여 친구가 돼요.',
   lang: 'ko', start_url: './', scope: './', display: 'standalone', orientation: 'portrait',
-  background_color: '#eef2f4', theme_color: '#0f6e78',
+  background_color: '#eef5fb', theme_color: '#1b74b8',
   icons: [
     { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
     { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -21,6 +21,7 @@ self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) =
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return; // 서버(Supabase) 요청은 건드리지 않는다
+  if (u.pathname.endsWith('/version.json')) return; // 새 버전 확인은 항상 인터넷으로
   // 저장해 둔 화면을 바로 보여 주고, 새 버전은 뒤에서 받아 다음에 열 때 쓴다 (느린 데이터에서도 바로 열리게)
   e.respondWith(caches.open(CACHE).then(async (c) => {
     const nav = e.request.mode === 'navigate';
@@ -47,6 +48,7 @@ self.addEventListener('notificationclick', (e) => {
 
 export function pwaPlugin(): Plugin {
   let demo = false;
+  const build = Date.now().toString(36); // 배포마다 바뀌는 번호. 화면이 이 번호로 새 버전을 알아챈다
   return {
     name: 'bunja-pwa',
     configResolved(c) { demo = c.mode === 'demo'; },
@@ -54,12 +56,13 @@ export function pwaPlugin(): Plugin {
       if (demo) return html; // 시연판(Claude 미리보기)에는 넣지 않는다
       return html.replace('</head>', [
         '<link rel="manifest" href="./manifest.webmanifest" />',
-        '<meta name="theme-color" content="#0f6e78" />',
+        '<meta name="theme-color" content="#1b74b8" />',
         '<link rel="apple-touch-icon" href="./apple-touch-icon.png" />',
         '<meta name="apple-mobile-web-app-capable" content="yes" />',
         '<meta name="mobile-web-app-capable" content="yes" />',
         '<meta name="apple-mobile-web-app-title" content="분자친구" />',
         '<meta name="apple-mobile-web-app-status-bar-style" content="default" />',
+        `<meta name="build-id" content="${build}" />`,
       ].join('\n') + '\n</head>');
     },
     generateBundle() {
@@ -67,6 +70,7 @@ export function pwaPlugin(): Plugin {
       for (const [fileName, b64] of Object.entries(ICONS)) this.emitFile({ type: 'asset', fileName, source: Buffer.from(b64, 'base64') });
       this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: JSON.stringify(MANIFEST, null, 2) });
       this.emitFile({ type: 'asset', fileName: 'sw.js', source: SW });
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ build }) });
     },
   };
 }

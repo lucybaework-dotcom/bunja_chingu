@@ -4,14 +4,14 @@ export const PROF = { name: '벤 교수님', title: '유기화학 연구실', fu
 export function Professor({ size = 44, mood = 'idle' }: { size?: number; mood?: 'idle' | 'think' | 'happy' }) {
   return (
     <svg className={`prof prof-${mood}`} width={size} height={size} viewBox="0 0 100 100" role="img" aria-label={PROF.name}>
-      <circle cx="50" cy="50" r="49" fill="#e6f2f3" />
+      <circle cx="50" cy="50" r="49" fill="#e3f1fc" />
       {/* 가운과 넥타이 */}
       <path d="M14 100 Q16 74 50 70 Q84 74 86 100Z" fill="#ffffff" stroke="#c9d6da" strokeWidth="1.5" />
       <path d="M50 71 L42 100 M50 71 L58 100" stroke="#c9d6da" strokeWidth="1.5" fill="none" />
-      <path d="M46 72 L54 72 L52 82 L50 86 L48 82Z" fill="#0f6e78" />
+      <path d="M46 72 L54 72 L52 82 L50 86 L48 82Z" fill="#1b74b8" />
       {/* 가슴 주머니의 벤젠 고리 배지 */}
-      <polygon points="70,82 74,84.3 74,88.9 70,91.2 66,88.9 66,84.3" fill="none" stroke="#0f6e78" strokeWidth="1.6" />
-      <circle cx="70" cy="86.6" r="2" fill="none" stroke="#0f6e78" strokeWidth="1" />
+      <polygon points="70,82 74,84.3 74,88.9 70,91.2 66,88.9 66,84.3" fill="none" stroke="#1b74b8" strokeWidth="1.6" />
+      <circle cx="70" cy="86.6" r="2" fill="none" stroke="#1b74b8" strokeWidth="1" />
       {/* 얼굴 */}
       <ellipse cx="50" cy="45" rx="22" ry="25" fill="#f6d7bd" />
       <ellipse cx="44" cy="27" rx="6" ry="2.5" fill="#fff" opacity=".45" />

@@ -9,7 +9,7 @@ export const onInstallChange = (f: () => void) => { subs.add(f); return () => { 
 export function setupPwa() {
   window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e as BIP; subs.forEach((f) => f()); });
   window.addEventListener('appinstalled', () => { deferred = null; subs.forEach((f) => f()); });
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('./sw.js').catch(() => undefined);
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('./sw.js').catch(() => undefined);
 }
 
 export const canPromptInstall = () => !!deferred;
@@ -57,4 +57,18 @@ export async function unsubscribePush(): Promise<string | null> {
   if (!sub) return null;
   const ep = sub.endpoint; await sub.unsubscribe().catch(() => undefined);
   return ep;
+}
+
+// ───── 새 버전 알아채기 ─────
+const myBuild = () => document.querySelector('meta[name="build-id"]')?.getAttribute('content') ?? '';
+/** 배포된 최신 번호와 지금 화면의 번호가 다르면 true */
+export async function hasUpdate(): Promise<boolean> {
+  if (!myBuild()) return false;
+  try { const r = await fetch(`./version.json?t=${Date.now()}`, { cache: 'no-store' }); if (!r.ok) return false; return (await r.json()).build !== myBuild(); }
+  catch { return false; }
+}
+/** 저장해 둔 앱 파일을 지우고 새로 받는다 */
+export async function applyUpdate() {
+  try { const ks = await caches.keys(); await Promise.all(ks.map((k) => caches.delete(k))); } catch { /* 무시 */ }
+  location.reload();
 }

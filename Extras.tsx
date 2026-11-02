@@ -125,7 +125,7 @@ export function PushToggle({ viewer, run, demo }: { viewer: string; run: Run; de
 // ───── 약속 장소 ─────
 function pinIcon(label: string) {
   return L.divIcon({ className: 'pin-wrap', iconSize: [44, 52], iconAnchor: [22, 50],
-    html: `<div class="pin place" style="--c:#0f6e78;--i:#fff"><span>★</span></div><div class="pin-label">${label.replace(/[<>&"]/g, '')}</div>` });
+    html: `<div class="pin place" style="--c:#1b74b8;--i:#fff"><span>★</span></div><div class="pin-label">${label.replace(/[<>&"]/g, '')}</div>` });
 }
 
 export function PlaceCard({ room, isHost, run, viewer }: { room: Room; isHost: boolean; run: Run; viewer: string }) {
@@ -170,7 +170,7 @@ function PlacePicker({ room, onClose, onSave, onClear }: { room: Room; onClose: 
     const start = room.place ?? CAMPUS.center;
     const map = L.map(el.current).setView([start.lat, start.lng], 17);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
-    L.polygon(CAMPUS.polygon, { color: '#0f6e78', weight: 2, fillOpacity: 0.05, dashArray: '6 6' }).addTo(map);
+    L.polygon(CAMPUS.polygon, { color: '#1b74b8', weight: 2, fillOpacity: 0.05, dashArray: '6 6' }).addTo(map);
     const place = (lat: number, lng: number) => {
       setPt({ lat, lng });
       if (marker.current) marker.current.setLatLng([lat, lng]); else marker.current = L.marker([lat, lng], { icon: pinIcon('여기') }).addTo(map);

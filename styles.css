@@ -1,14 +1,15 @@
 /* Layout: 모바일 앱 한 기둥(최대 560px) + 하단 탭. 원자는 분자 모형 키트(CPK) 색을 쓰되 항상 기호 텍스트를 함께 적는다. */
 :root {
-  --bg: #eef2f4;
+  --bg: #eef5fb;
   --surface: #ffffff;
-  --surface-2: #e3e9ed;
-  --ink: #17232c;
-  --ink-2: #4c5b66;
-  --line: #c9d3da;
-  --accent: #0f6e78;
+  --surface-2: #e1ecf5;
+  --ink: #15222e;
+  --ink-2: #4a5b6a;
+  --line: #c6d6e4;
+  --accent: #1b74b8;
   --accent-ink: #ffffff;
-  --accent-soft: #d5ecee;
+  --accent-soft: #dcecf9;
+  --sky: #5ab8f0;
   --warn: #a24d00;
   --warn-soft: #fbe9d7;
   --bad: #b3261e;
@@ -21,16 +22,16 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f171c; --surface: #172329; --surface-2: #213139; --ink: #e6eef2; --ink-2: #9fb1bb; --line: #2f424c;
-    --accent: #5fc4cc; --accent-ink: #062226; --accent-soft: #163a3f; --warn: #f0a868; --warn-soft: #3a2a19;
+    --bg: #0d1720; --surface: #14222e; --surface-2: #1d3040; --ink: #e6eef5; --ink-2: #9fb3c4; --line: #2c4255;
+    --accent: #7cc6f5; --accent-ink: #06233a; --accent-soft: #14324a; --sky: #7cc6f5; --warn: #f0a868; --warn-soft: #3a2a19;
     --bad: #f2867e; --ok: #77c98c;
     --atom-ring: #9fb1bb;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f171c; --surface: #172329; --surface-2: #213139; --ink: #e6eef2; --ink-2: #9fb1bb; --line: #2f424c;
-  --accent: #5fc4cc; --accent-ink: #062226; --accent-soft: #163a3f; --warn: #f0a868; --warn-soft: #3a2a19;
+  --bg: #0d1720; --surface: #14222e; --surface-2: #1d3040; --ink: #e6eef5; --ink-2: #9fb3c4; --line: #2c4255;
+  --accent: #7cc6f5; --accent-ink: #06233a; --accent-soft: #14324a; --sky: #7cc6f5; --warn: #f0a868; --warn-soft: #3a2a19;
   --bad: #f2867e; --ok: #77c98c;
   --atom-ring: #9fb1bb;
   color-scheme: dark;
@@ -221,7 +222,7 @@ textarea.input { resize: vertical; }
 .chip.pick { cursor: pointer; font-size: 13px; padding: 5px 11px; }
 .chip.pick:disabled { opacity: .45; cursor: not-allowed; }
 .meter { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
-.meter > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--ok)); border-radius: 4px; transition: width .4s; }
+.meter > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--sky)); border-radius: 4px; transition: width .4s; }
 .switch { width: 52px; height: 30px; border-radius: 999px; border: none; background: var(--surface-2); position: relative; cursor: pointer; flex: none; box-shadow: inset 0 0 0 1px var(--line); }
 .switch span { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / .3); transition: transform .2s cubic-bezier(.3,1.5,.5,1); }
 .switch.on { background: var(--accent); }
@@ -258,7 +259,7 @@ details summary { cursor: pointer; }
 .tcard-note { font-size: 11px; color: var(--ink-2); line-height: 1.4; }
 .tcard-rec { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
 .tcard-shine { position: absolute; inset: 0; border-radius: 18px; pointer-events: none; background: radial-gradient(circle at var(--gx) var(--gy), rgb(255 255 255 / .35), transparent 45%); mix-blend-mode: soft-light; }
-.tcard-backart { height: 100%; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; color: #fff; background: radial-gradient(circle at 50% 40%, #1b8a95, #0b4f57 70%), repeating-linear-gradient(45deg, transparent 0 10px, rgb(255 255 255 / .06) 10px 20px); background-blend-mode: overlay; }
+.tcard-backart { height: 100%; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; color: #fff; background: radial-gradient(circle at 50% 40%, #3aa3e8, #145a92 70%), repeating-linear-gradient(45deg, transparent 0 10px, rgb(255 255 255 / .06) 10px 20px); background-blend-mode: overlay; }
 .tcard-brand { font-family: var(--f-display); font-size: 28px; letter-spacing: .04em; }
 .mol3d.bare canvas { background: transparent; }
 
@@ -363,7 +364,7 @@ a.btn { text-decoration: none; color: inherit; display: inline-flex; align-items
 .option.way { padding: 14px 16px; }
 .way-ic { font-size: 26px; line-height: 1; }
 .ai-chat { min-height: 46vh; max-height: 60vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 16px; padding: 12px; background: var(--surface); }
-.ai-av { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--f-mono); color: #fff; background: linear-gradient(135deg, #0f6e78, #5fc4cc); }
+.ai-av { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--f-mono); color: #fff; background: linear-gradient(135deg, #1b74b8, #7cc6f5); }
 .bubble.typing { display: flex; gap: 4px; align-items: center; padding: 12px 14px; }
 .bubble.typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-2); animation: typing 1s infinite ease-in-out; }
 .bubble.typing span:nth-child(2) { animation-delay: .15s; } .bubble.typing span:nth-child(3) { animation-delay: .3s; }
@@ -400,3 +401,5 @@ a.btn { text-decoration: none; color: inherit; display: inline-flex; align-items
 @keyframes foil-shift { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
 @keyframes twinkle { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .tcard-face.r-diamond, .tcard-face.r-rainbow, .dex.owned.r-diamond, .dex.owned.r-rainbow, .tcard-face.r-diamond::after, .tcard-face.r-rainbow::after { animation: none; } }
+.update-bar { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 50; width: min(420px, calc(100% - 32px)); display: block; border: none; cursor: pointer; padding: 10px 14px; border-radius: 12px; background: var(--accent); color: #fff; font: inherit; font-size: 14px; box-shadow: 0 8px 20px rgb(0 0 0 / .2); animation: bar-in .4s cubic-bezier(.3,1.5,.5,1) both; }
+@keyframes bar-in { from { transform: translate(-50%, -20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
