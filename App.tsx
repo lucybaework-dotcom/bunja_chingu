@@ -386,6 +386,7 @@ function Quiz({ onDone, onSkip }: { onDone: (a: Record<string, number>) => void;
 
 function ElementDetail({ el }: { el: ElementId }) {
   const e = ELEMENTS[el];
+  const [pair, setPair] = useState<{ o: ElementId; i: number } | null>(null);
   return (
     <div className="stack">
       <div className="row" style={{ gap: 14, flexWrap: 'nowrap' }}>
@@ -399,9 +400,20 @@ function ElementDetail({ el }: { el: ElementId }) {
         <h3>다른 원소와는</h3>
         <div className="row" style={{ gap: 6 }}>
           {usableElements().flatMap((o) => pairContent(el, o).map((p, i) => (
-            <span key={`${o}${i}`} className="chip pair-chip" title={p.body}><Atom el={o} size={20} />{p.title}</span>
+            <button key={`${o}${i}`} type="button" className="chip pick pair-chip" onClick={() => setPair({ o, i })} aria-haspopup="dialog"><Atom el={o} size={20} />{p.title}</button>
           )))}
         </div>
+        {pair && (() => { const p = pairContent(el, pair.o)[pair.i]; if (!p) return null; return (
+          <div className="sheet-bg" onClick={() => setPair(null)}>
+            <div className="sheet pair-pop" role="dialog" aria-label={p.title} onClick={(e) => e.stopPropagation()}>
+              <div className="row" style={{ gap: 6, justifyContent: 'center' }}><Atom el={el} size={44} /><span className="bond" style={{ width: 22, height: 4, background: 'var(--ink-2)' }} /><Atom el={pair.o} size={44} /></div>
+              <h2 style={{ textAlign: 'center' }}>{p.title}</h2>
+              <p>{p.body}</p>
+              <p className="small muted">{p.chemistryContext}</p>
+              <button className="btn primary block" onClick={() => setPair(null)}>닫기</button>
+            </div>
+          </div>
+        ); })()}
       </div>
     </div>
   );
