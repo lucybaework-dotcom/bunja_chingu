@@ -14,15 +14,21 @@ const MANIFEST = {
 };
 
 const SW = `// 분자친구 서비스 워커: 화면 파일을 저장해 두고(새 버전은 네트워크 우선), 알림을 띄운다.
-const CACHE = 'bunja-shell-v1';
+const CACHE = 'bunja-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png'];
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {})); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return; // 서버(Supabase) 요청은 건드리지 않는다
-  e.respondWith(fetch(e.request).then((r) => { const copy = r.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {}); return r; })
-    .catch(() => caches.match(e.request).then((m) => m || caches.match('./index.html'))));
+  // 저장해 둔 화면을 바로 보여 주고, 새 버전은 뒤에서 받아 다음에 열 때 쓴다 (느린 데이터에서도 바로 열리게)
+  e.respondWith(caches.open(CACHE).then(async (c) => {
+    const nav = e.request.mode === 'navigate';
+    const hit = (await c.match(e.request, { ignoreSearch: true })) || (nav ? await c.match('./index.html') : undefined);
+    const net = fetch(e.request).then((r) => { if (r.ok) c.put(nav ? './index.html' : e.request, r.clone()).catch(() => {}); return r; });
+    if (hit) { e.waitUntil(net.catch(() => {})); return hit; }
+    return net.catch(() => c.match('./index.html'));
+  }));
 });
 self.addEventListener('push', (e) => {
   let d = { title: '분자친구', body: '새 소식이 있어요.', url: './', tag: 'bunja' };

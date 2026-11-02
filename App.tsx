@@ -292,19 +292,20 @@ function AiAdvisor({ onDone, onQuiz }: { onDone: () => void; onQuiz: () => void 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [result, setResult] = useState<AiReply | null>(null);
+  const [partial, setPartial] = useState('');
   const ref = useRef<HTMLDivElement>(null);
   const answers = turns.filter((t) => t.role === 'user').length;
   const ask = async (hist: AiTurn[], finish = false) => {
-    setBusy(true); setErr('');
-    const r = await backend.ai(hist, finish);
-    setBusy(false);
+    setBusy(true); setErr(''); setPartial('');
+    const r = await backend.ai(hist, finish, setPartial);
+    setBusy(false); setPartial('');
     if (!r.ok) { setErr(r.error); return false; }
     setTurns([...hist, { role: 'ai', text: r.reply.reply }]);
     if (r.reply.done) setResult(r.reply);
     return true;
   };
   useEffect(() => { void ask([]); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { ref.current?.scrollTo({ top: ref.current.scrollHeight, behavior: 'smooth' }); }, [turns.length, busy, result]);
+  useEffect(() => { ref.current?.scrollTo({ top: ref.current.scrollHeight }); }, [turns.length, busy, result, partial.length > 0 && Math.floor(partial.length / 40)]);
   const send = async () => {
     const t = txt.trim(); if (!t || busy) return;
     const hist = [...turns, { role: 'user' as const, text: t }];
@@ -325,7 +326,9 @@ function AiAdvisor({ onDone, onQuiz }: { onDone: () => void; onQuiz: () => void 
             <div className="bubble">{t.role === 'ai' && <><span className="small" style={{ fontWeight: 700 }}>{PROF.name}</span><br /></>}{t.text}</div>
           </div>
         ))}
-        {busy && <div className="msg"><span className="ai-av" aria-hidden="true"><Professor size={30} mood="think" /></span><div className="bubble typing" aria-label="교수님이 생각하는 중"><span /><span /><span /></div></div>}
+        {busy && (partial
+          ? <div className="msg"><span className="ai-av" aria-hidden="true"><Professor size={30} /></span><div className="bubble"><span className="small" style={{ fontWeight: 700 }}>{PROF.name}</span><br />{partial}<span className="caret" aria-hidden="true" /></div></div>
+          : <div className="msg"><span className="ai-av" aria-hidden="true"><Professor size={30} mood="think" /></span><div className="bubble typing" aria-label="교수님이 생각하는 중"><span /><span /><span /></div></div>)}
         {result && (
           <div className="panel ai-result">
             <div className="row" style={{ gap: 8 }}><Professor size={34} mood="happy" /><span className="eyebrow">{PROF.name}의 추천 원소</span></div>

@@ -19,7 +19,7 @@ export interface Backend {
   reset(): void;
   signOut?(): Promise<void>;
   /** AI 원소 상담 한 번 주고받기 */
-  ai(history: AiTurn[], finish: boolean): Promise<AiResult>;
+  ai(history: AiTurn[], finish: boolean, onPartial?: (text: string) => void): Promise<AiResult>;
 }
 
 const KEY = 'bunja-chingu-demo-v1';
@@ -60,9 +60,11 @@ export class LocalBackend implements Backend {
     }
   }
   /** 시연판: 서버와 AI 없이 정해진 질문으로 상담을 흉내 낸다 */
-  async ai(history: AiTurn[], finish: boolean): Promise<AiResult> {
-    await new Promise((r) => setTimeout(r, 500));
+  async ai(history: AiTurn[], finish: boolean, onPartial?: (text: string) => void): Promise<AiResult> {
+    await new Promise((r) => setTimeout(r, 350));
     const reply = demoAdvisor(history, finish);
+    // 실제처럼 글자가 조금씩 나오게
+    if (onPartial) for (let i = 4; i < reply.reply.length + 4; i += 4) { onPartial(reply.reply.slice(0, i)); await new Promise((r) => setTimeout(r, 25)); }
     if (reply.done && this.state.meId) { const r = await this.dispatch({ type: 'recordAdvice', actor: this.state.meId, ranking: reply.ranking }); if (!r.ok) return { ok: false, error: r.error! }; }
     return { ok: true, reply };
   }
@@ -75,6 +77,8 @@ export interface RemoteTransport {
   call(body: unknown): Promise<{ status: number; json: Record<string, unknown> }>;
   onChange(fn: () => void): () => void;
   signOut(): Promise<void>;
+  /** 한 줄에 JSON 하나씩 오는 응답을 읽는다 (교수님 답 흘려받기) */
+  stream?(body: unknown, onLine: (o: Record<string, unknown>) => void): Promise<{ status: number; json?: Record<string, unknown> }>;
 }
 
 export class RemoteBackend implements Backend {
@@ -83,22 +87,43 @@ export class RemoteBackend implements Backend {
   private subs = new Set<() => void>();
   private stopWatch: () => void = () => {};
   private timer: ReturnType<typeof setInterval> | undefined;
-  constructor(private t: RemoteTransport, private here: () => { lat: number; lng: number } | null = () => null) {}
+  constructor(private t: RemoteTransport, private here: () => { lat: number; lng: number } | null = () => null, private uid = '') {}
 
-  /** 처음 한 번 서버에서 내 보기를 받아 오고, 바뀔 때마다 다시 받는다. */
+  private get cacheKey() { return `bunja-view-${this.uid}`; }
+  /** 지난번에 받은 내 보기가 이 기기에 있으면 먼저 보여 준다 (서버 응답을 기다리지 않고 바로 열리게) */
+  primeFromCache(): boolean {
+    if (!this.uid) return false;
+    try {
+      const v = JSON.parse(localStorage.getItem(this.cacheKey) ?? 'null') as State | null;
+      if (v && v.meId === this.uid && v.version === 1) { this.state = normalize(v); return true; }
+    } catch { /* 없거나 깨졌으면 무시 */ }
+    return false;
+  }
+  clearCache() { try { localStorage.removeItem(this.cacheKey); } catch { /* 무시 */ } }
+
+  /** 서버에서 내 보기를 받아 오고, 바뀔 때마다 다시 받는다. */
   async start() {
-    await this.refresh();
     this.stopWatch = this.t.onChange(() => { this.refresh().catch(() => undefined); });
     this.timer = setInterval(() => { this.refresh().catch(() => undefined); }, 20_000); // 실시간 연결이 끊겨도 따라잡도록
+    await this.refresh();
   }
+  private inflight: Promise<void> | null = null;
   stop() { this.stopWatch(); clearInterval(this.timer); }
-  async refresh() {
+  /** 동시에 여러 번 불려도 서버에는 한 번만 묻는다 */
+  refresh(): Promise<void> {
+    if (!this.inflight) this.inflight = this.fetchView().finally(() => { this.inflight = null; });
+    return this.inflight;
+  }
+  private async fetchView() {
     const h = this.here();
     const r = await this.t.call({ action: 'view', ...(h ? { here: { lat: h.lat, lng: h.lng } } : {}) });
     if (r.status === 200 && r.json.view) this.set(r.json.view as State);
     else if (r.status >= 400) throw Object.assign(new Error(String(r.json.error ?? '서버에 연결하지 못했어요.')), { status: r.status });
   }
-  private set(s: State) { this.state = s; this.subs.forEach((f) => f()); }
+  private set(s: State) {
+    this.state = s; this.subs.forEach((f) => f());
+    if (this.uid && s.meId === this.uid) { try { localStorage.setItem(this.cacheKey, JSON.stringify(s)); } catch { /* 저장 공간이 없으면 다음에 기다리면 됨 */ } }
+  }
   getState(): State {
     if (!this.state) throw new Error('아직 불러오지 않았어요.');
     return this.state;
@@ -114,7 +139,19 @@ export class RemoteBackend implements Backend {
       return { ok: false, error: '인터넷 연결을 확인하고 다시 시도해 주세요.' };
     }
   }
-  async ai(history: AiTurn[], finish: boolean): Promise<AiResult> {
+  async ai(history: AiTurn[], finish: boolean, onPartial?: (text: string) => void): Promise<AiResult> {
+    if (this.t.stream) {
+      try {
+        let result: AiResult = { ok: false, error: '교수님 답이 끊겼어요. 다시 보내 주세요.' };
+        const r = await this.t.stream({ action: 'ai', history, finish, stream: true }, (o) => {
+          if (o.t === 'delta' && typeof o.text === 'string') onPartial?.(o.text);
+          else if (o.t === 'done') { if (o.view) this.set(o.view as State); result = { ok: true, reply: o.ai as AiReply }; }
+          else if (o.t === 'error') result = { ok: false, error: String(o.error) };
+        });
+        if (r.json) return { ok: false, error: String(r.json.error ?? '교수님이 답하지 못했어요.') };
+        return result;
+      } catch { return { ok: false, error: '인터넷 연결을 확인하고 다시 시도해 주세요.' }; }
+    }
     try {
       const r = await this.t.call({ action: 'ai', history, finish });
       if (r.json.view) this.set(r.json.view as State);
@@ -124,5 +161,5 @@ export class RemoteBackend implements Backend {
   }
   subscribe(fn: () => void) { this.subs.add(fn); return () => { this.subs.delete(fn); }; }
   reset() {}
-  async signOut() { this.stop(); await this.t.signOut(); }
+  async signOut() { this.stop(); this.clearCache(); await this.t.signOut(); }
 }

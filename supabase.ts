@@ -22,6 +22,27 @@ export function supabaseTransport(): RemoteTransport {
       const json = await res.json().catch(() => ({ error: `서버 응답을 읽지 못했어요 (${res.status}).` }));
       return { status: res.status, json };
     },
+    async stream(body, onLine) {
+      const { data } = await sb.auth.getSession();
+      const token = data.session?.access_token;
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/${FUNCTION_NAME}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_PUBLISHABLE_KEY, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify(body),
+      });
+      if (!(res.headers.get('content-type') ?? '').includes('ndjson') || !res.body) {
+        return { status: res.status, json: await res.json().catch(() => ({ error: `서버 응답을 읽지 못했어요 (${res.status}).` })) };
+      }
+      const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (value) buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (line) { try { onLine(JSON.parse(line)); } catch { /* 깨진 줄은 건너뜀 */ } } }
+        if (done) break;
+      }
+      return { status: res.status };
+    },
     onChange(fn) {
       const ch = sb.channel('app-version')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'app_version' }, () => fn())

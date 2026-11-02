@@ -17,7 +17,9 @@ export interface Deps {
   /** 탈퇴한 사람의 로그인 계정 지우기 */
   deleteAuthUser?(uid: string): Promise<void>;
   /** AI 원소 상담 (없으면 꺼짐) */
-  ai?(history: AiTurn[], finish: boolean): Promise<AiReply>;
+  ai?(history: AiTurn[], finish: boolean, onText?: (replySoFar: string) => void): Promise<AiReply>;
+  /** 응답을 먼저 보내고 뒤에서 마저 할 일 (알림 보내기 등). 없으면 기다렸다가 응답 */
+  background?(p: Promise<unknown>): void;
 }
 
 export interface PushData { title: string; body: string; url: string; tag: string }
@@ -51,7 +53,7 @@ const CLIENT_COMMANDS = new Set<Command['type']>([
   'setVacancyAlert', 'setTitle',
 ]);
 
-export interface Reply { status: number; body: Record<string, unknown> }
+export interface Reply { status: number; body: Record<string, unknown>; stream?: ReadableStream<Uint8Array> }
 
 /** 클라이언트가 보낸 명령을 받아들일 수 있는 모양으로 고친다. 행동 주체는 항상 로그인한 본인. */
 export function sanitize(raw: unknown, uid: string, s: State): Command {
@@ -63,6 +65,17 @@ export function sanitize(raw: unknown, uid: string, s: State): Command {
       ...(typeof c.consentVersion === 'string' ? { consentVersion: c.consentVersion } : {}) };
   }
   return { ...(c as object), actor: uid } as Command;
+}
+
+export function pruneNotifications(s: State, now: number): State['notifications'] | null {
+  const per: Record<string, number> = {}; const out: State['notifications'] = [];
+  for (let i = s.notifications.length - 1; i >= 0; i--) {
+    const n = s.notifications[i];
+    per[n.userId] = (per[n.userId] ?? 0) + 1;
+    if (per[n.userId] > 60 || (n.readAt && now - n.readAt > 30 * 86_400_000)) continue;
+    out.push(n);
+  }
+  return out.length === s.notifications.length ? null : out.reverse();
 }
 
 /** 지난 모집 기한·투표 기한을 처리한다 (서버 시각 기준). */
@@ -77,6 +90,9 @@ export function sweep(s: State, now: number): { state: State; changed: boolean }
     if (state.proposals.some((p) => p.roomId === r.id && p.status === 'open')) continue;
     try { state = apply(state, { type: 'expireRecruitment', roomId: r.id }, now).state; changed = true; } catch { /* 무시 */ }
   }
+  // 알림이 끝없이 쌓여 저장 크기가 커지지 않게: 사람마다 최근 60개, 읽은 지 30일 지난 건 지운다
+  const keep = pruneNotifications(state, now);
+  if (keep) { state = { ...state, notifications: keep }; changed = true; }
   const rem = remindMeetings(state, now);
   if (rem.changed) { state = rem.state; changed = true; }
   return { state, changed };
@@ -99,6 +115,58 @@ async function sendPushes(deps: Deps, before: State, after: State, actor: string
 
 const kstDay = (t: number) => new Date(t + 9 * 3_600_000).toISOString().slice(0, 10);
 
+type AiPre = { history: AiTurn[]; finish: boolean } | { error: string; status: number };
+function aiPrecheck(uid: string, b: { history?: unknown; finish?: unknown }, s: State, now: number, deps: Deps): AiPre {
+  if (!deps.ai) return { error: 'AI 상담이 아직 준비되지 않았어요. 질문 테스트로 찾아 주세요.', status: 503 };
+  const u = s.users[uid];
+  if (!u) return { error: '먼저 가입을 마쳐 주세요.', status: 400 };
+  if (u.elementLockedAt) return { error: '원소를 확정한 뒤에는 상담을 다시 받을 수 없어요.', status: 400 };
+  const history = cleanHistory(b.history);
+  if (!history) return { error: '대화가 너무 길어요. 처음부터 다시 시작해 주세요.', status: 400 };
+  const used = s.aiUsage?.[uid];
+  if (used?.day === kstDay(now) && used.n >= AI_LIMITS.perDay) return { error: '오늘 AI 상담 횟수를 다 썼어요. 내일 다시 하거나 질문 테스트로 찾아 주세요.', status: 429 };
+  const answers = history.filter((t) => t.role === 'user').length;
+  return { history, finish: b.finish === true || answers >= AI_LIMITS.forceFinishAfter };
+}
+function aiApply(s: State, uid: string, reply: AiReply, now: number): State {
+  const day = kstDay(now); const used = s.aiUsage?.[uid];
+  let next: State = { ...s, aiUsage: { ...(s.aiUsage ?? {}), [uid]: { day, n: (used?.day === day ? used.n : 0) + 1 } } };
+  if (reply.done) next = apply(next, { type: 'recordAdvice', actor: uid, ranking: reply.ranking }, now).state;
+  return next;
+}
+const aiErr = (e: unknown) => (e as { status?: number }).status === 429 ? '교수님이 지금 바빠요. 잠시 후 다시 보내 주세요.' : '교수님이 답하지 못했어요. 다시 보내 주세요.';
+
+/** 교수님 답을 조금씩 흘려보낸다 (한 줄에 JSON 하나: delta → done 또는 error) */
+async function streamAi(uid: string, b: { history?: unknown; finish?: unknown }, here: { lat: number; lng: number } | null, deps: Deps): Promise<Reply> {
+  const loaded = await deps.load(); const now = deps.now();
+  const pre = aiPrecheck(uid, b, normalize(loaded?.state ?? emptyState()), now, deps);
+  if ('error' in pre) return { status: pre.status, body: { error: pre.error } };
+  const enc = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(ctrl) {
+      const send = (o: object) => ctrl.enqueue(enc.encode(JSON.stringify(o) + '\n'));
+      try {
+        const reply = await deps.ai!(pre.history, pre.finish, (text) => send({ t: 'delta', text }));
+        let saved: State | null = null;
+        for (let i = 0; i < 5 && !saved; i++) {
+          const cur = await deps.load(); const t = deps.now();
+          const next = aiApply(normalize(cur?.state ?? emptyState()), uid, reply, t);
+          if (await deps.save(cur ? cur.version : null, next)) saved = next;
+        }
+        if (!saved) throw new Error('save');
+        const bump = deps.bump().catch(() => undefined);
+        if (deps.background) deps.background(bump); else await bump;
+        send({ t: 'done', ai: reply, view: viewFor(saved, uid, here, deps.now()) });
+      } catch (e) {
+        console.error('ai', e);
+        send({ t: 'error', error: aiErr(e) });
+      }
+      ctrl.close();
+    },
+  });
+  return { status: 200, body: {}, stream };
+}
+
 /** AI 상담 한 번: 하루 횟수 확인 → 모델 호출 → 끝났으면 추천을 기록 */
 async function runAi(uid: string, b: { history?: unknown; finish?: unknown }, s: State, now: number, deps: Deps, cached?: AiReply):
   Promise<{ state: State; reply: AiReply } | { error: string; status: number }> {
@@ -116,7 +184,7 @@ async function runAi(uid: string, b: { history?: unknown; finish?: unknown }, s:
   try { reply = cached ?? await deps.ai(history, b.finish === true || answers >= AI_LIMITS.forceFinishAfter); }
   catch (e) {
     console.error('ai', e);
-    return { error: (e as { status?: number }).status === 429 ? 'AI가 지금 바빠요. 잠시 후 다시 보내 주세요.' : 'AI가 답하지 못했어요. 다시 보내 주세요.', status: 502 };
+    return { error: aiErr(e), status: 502 };
   }
   let next: State = { ...s, aiUsage: { ...(s.aiUsage ?? {}), [uid]: { day, n: n + 1 } } };
   if (reply.done) next = apply(next, { type: 'recordAdvice', actor: uid, ranking: reply.ranking }, now).state;
@@ -147,6 +215,7 @@ export async function handle(token: string | null, body: unknown, deps: Deps): P
   const b = (body ?? {}) as { action?: string; cmd?: unknown; here?: { lat?: unknown; lng?: unknown } };
   const here = b.here && typeof b.here.lat === 'number' && typeof b.here.lng === 'number' ? { lat: b.here.lat, lng: b.here.lng } : null;
   const isAdminEmail = ADMIN_EMAILS.includes(user.email.toLowerCase());
+  if (b.action === 'ai' && (b as { stream?: unknown }).stream === true) return streamAi(user.id, b as { history?: unknown; finish?: unknown }, here, deps);
 
   let aiCache: AiReply | undefined;
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -178,9 +247,10 @@ export async function handle(token: string | null, body: unknown, deps: Deps): P
     if (changed) {
       const saved = await deps.save(loaded ? loaded.version : null, next);
       if (!saved) continue; // 다른 사람이 먼저 저장함 → 최신 상태로 다시 처리
-      await deps.bump();
       if (out.info === 'deleted' && deps.deleteAuthUser) await deps.deleteAuthUser(user.id).catch(() => undefined);
-      if (deps.sendPush) await sendPushes(deps, base, next, user.id);
+      // 다른 사람 화면 갱신 신호와 폰 알림은 응답을 보낸 뒤에 처리한다
+      const after = (async () => { await deps.bump(); if (deps.sendPush) await sendPushes(deps, base, next, user.id); })();
+      if (deps.background) deps.background(after.catch((e) => console.error('after', e))); else await after;
     }
     return { status: 200, body: { ...out, view: viewFor(next, user.id, here, now) } };
   }

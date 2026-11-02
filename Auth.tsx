@@ -33,10 +33,15 @@ export default function AuthGate() {
   useEffect(() => {
     if (!session) { backend?.stop(); setBackend(null); return; }
     if (backend) return;
-    const b = new RemoteBackend(supabaseTransport(), lastKnown);
+    const b = new RemoteBackend(supabaseTransport(), lastKnown, session.user.id);
+    // 이 기기에 지난 화면이 있으면 바로 보여 주고, 최신 내용은 뒤에서 받아 바꾼다
+    const primed = b.primeFromCache();
+    if (primed) setBackend(b);
     b.start().then(() => setBackend(b)).catch(async (e: Error & { status?: number }) => {
+      if (primed && e.status !== 401) return; // 화면은 그대로 두고 20초마다 다시 시도
       b.stop();
       if (e.status === 401) {
+        b.clearCache(); setBackend(null);
         // 지워진 계정이거나 오래된 로그인 정보: 이 기기의 로그인 정보를 지우고 로그인 화면으로
         await supabase().auth.signOut({ scope: 'local' }).catch(() => undefined);
         setNotice('로그인이 만료됐어요. 다시 로그인해 주세요.');

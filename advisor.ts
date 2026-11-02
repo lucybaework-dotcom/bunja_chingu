@@ -93,3 +93,20 @@ export function demoAdvisor(history: AiTurn[], finish: boolean): AiReply {
   }
   return { reply: DEMO_Q[answers.length], done: false, ranking: [] };
 }
+
+/** 아직 다 오지 않은 JSON에서 "reply" 글자만 지금까지 온 만큼 꺼낸다 */
+export function partialReply(json: string): string | null {
+  const m = /"reply"\s*:\s*"/.exec(json); if (!m) return null;
+  let out = ''; let i = m.index + m[0].length;
+  while (i < json.length) {
+    const c = json[i];
+    if (c === '"') return out;
+    if (c === '\\') {
+      const n = json[i + 1]; if (n === undefined) break;
+      if (n === 'u') { const h = json.slice(i + 2, i + 6); if (h.length < 4) break; out += String.fromCharCode(parseInt(h, 16)); i += 6; continue; }
+      out += ({ n: '\n', t: '\t', r: '', b: '', f: '' } as Record<string, string>)[n] ?? n; i += 2; continue;
+    }
+    out += c; i++;
+  }
+  return out;
+}
