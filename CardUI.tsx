@@ -11,14 +11,16 @@ import Molecule3D from './Molecule3D';
 
 export const dexNo = (id: string) => USABLE().findIndex((m) => m.id === id) + 1;
 
-function foil(id: string) {
-  const m = moleculeById(id)!;
-  // 원소 색 사이사이에 금색·청록 홀로그램 색을 섞어 흰색(H)만 있는 카드도 테두리가 보이게
-  const cs = [...new Set(slotsOf(m.atomCounts, m.formula))].map((e) => elementColor(e).bg);
-  const holo = ['#d9b45a', '#5fc4cc', '#c792ea'];
-  const stops = cs.flatMap((c, i) => [c, holo[i % holo.length]]);
-  return `conic-gradient(from 210deg, ${[...stops, ...stops, stops[0]].join(', ')})`;
-}
+/** 원자 수가 많을수록 레어한 테두리: 2 브론즈 · 3 실버 · 4 골드 · 5 다이아 · 6 무지개 */
+export const RARITY = [
+  { min: 0, id: 'bronze', label: '브론즈', foil: 'linear-gradient(135deg, #7a4a24 0%, #c98a52 22%, #f0c08e 38%, #a8662f 55%, #e2a873 75%, #6e3f1c 100%)' },
+  { min: 3, id: 'silver', label: '실버', foil: 'linear-gradient(135deg, #8d969e 0%, #e9eef2 20%, #b4bcc3 40%, #ffffff 52%, #9ea7af 70%, #dfe5ea 85%, #7d868e 100%)' },
+  { min: 4, id: 'gold', label: '골드', foil: 'linear-gradient(135deg, #9a6b12 0%, #f6d36b 20%, #fff2b8 34%, #d9a62b 50%, #ffe28a 68%, #b07d18 84%, #f3c94f 100%)' },
+  { min: 5, id: 'diamond', label: '다이아', foil: 'conic-gradient(from 200deg, #6fd3ff, #ffffff, #3aa8e0, #d9f6ff, #9b8cff, #ffffff, #5cc8f2, #c9f1ff, #6fd3ff)' },
+  { min: 6, id: 'rainbow', label: '무지개', foil: 'conic-gradient(from 210deg, #ff5f6d, #ffb347, #ffe66d, #7bed9f, #4facfe, #a77bff, #ff6ec7, #ff5f6d)' },
+] as const;
+export const rarityOf = (id: string) => { const n = moleculeById(id)!.totalAtoms; return [...RARITY].reverse().find((r) => n >= r.min)!; };
+const foil = (id: string) => rarityOf(id).foil;
 
 /** 카드 한 장. records가 있으면 뒷면에 만남 기록을, 없으면 카드 뒷면 무늬를 보여 준다 */
 export function MolCard({ id, flipped = false, onFlip, records, live3d = true, tilt = true }: {
@@ -40,9 +42,9 @@ export function MolCard({ id, flipped = false, onFlip, records, live3d = true, t
   return (
     <div className="tcard" ref={ref} onPointerMove={move} onPointerLeave={leave}>
       <button type="button" className={`tcard-inner${flipped ? ' flipped' : ''}`} onClick={onFlip} aria-label={`${m.name} 카드${flipped ? ' 뒷면' : ' 앞면'}. 눌러서 뒤집기`}>
-        <div className="tcard-face tcard-front" style={{ ['--foil' as string]: foil(id) }}>
+        <div className={`tcard-face tcard-front r-${rarityOf(id).id}`} style={{ ['--foil' as string]: foil(id) }}>
           <div className="tcard-body">
-            <div className="row between tcard-top"><span className="mono">No.{String(dexNo(id)).padStart(2, '0')}</span><span>{kindLabel(m)}</span></div>
+            <div className="row between tcard-top"><span className="mono">No.{String(dexNo(id)).padStart(2, '0')}</span><span className="row" style={{ gap: 6 }}><span>{kindLabel(m)}</span><span className={`rarity r-${rarityOf(id).id}`}>{rarityOf(id).label}</span></span></div>
             <div className="tcard-title"><Formula f={m.formula} className="formula" /><span className="tcard-name">{m.name}</span></div>
             <div className="tcard-art">{live3d ? <Molecule3D id={id} height={150} label={m.name} bare /> : <MiniAtoms id={id} />}</div>
             <div className="tcard-atoms">{counts.map(([e, n]) => <span key={e} className="row" style={{ gap: 3 }}><Atom el={e} size={20} /><span className="mono small">×{n}</span></span>)}</div>
@@ -50,7 +52,7 @@ export function MolCard({ id, flipped = false, onFlip, records, live3d = true, t
           </div>
           <span className="tcard-shine" aria-hidden="true" />
         </div>
-        <div className="tcard-face tcard-back" style={{ ['--foil' as string]: foil(id) }}>
+        <div className={`tcard-face tcard-back r-${rarityOf(id).id}`} style={{ ['--foil' as string]: foil(id) }}>
           {records ? (
             <div className="tcard-body">
               <div className="row between tcard-top"><span className="mono">No.{String(dexNo(id)).padStart(2, '0')}</span><span>함께한 만남 {records.length}회</span></div>
@@ -92,7 +94,7 @@ export function CardBackPattern() {
 export function DexTile({ id, owned, pending, mineFits, onOpen }: { id: string; owned: boolean; pending: boolean; mineFits: boolean; onOpen?: () => void }) {
   const m = moleculeById(id)!;
   return (
-    <button type="button" className={`dex${owned ? ' owned' : ' locked'}`} style={owned ? { ['--foil' as string]: foil(id) } : undefined} onClick={onOpen} disabled={!owned && !pending}
+    <button type="button" className={`dex${owned ? ` owned r-${rarityOf(id).id}` : ' locked'}`} style={owned ? { ['--foil' as string]: foil(id) } : undefined} onClick={onOpen} disabled={!owned && !pending}
       aria-label={`${m.name} ${owned ? '모음' : pending ? '받을 수 있음' : '아직 못 모음'}`}>
       <span className="dex-no mono">{String(dexNo(id)).padStart(2, '0')}</span>
       <Formula f={m.formula} className="formula dex-f" />
@@ -189,7 +191,7 @@ export function CardReveal({ record, onClaim, onClose }: { record: MeetingRecord
         )}
         {stage === 'show' && (
           <div className="stack-s reveal-text">
-            <h2>{m.name} 카드를 얻었어요!</h2>
+            <h2><span className={`rarity r-${rarityOf(id).id}`} style={{ fontSize: 13, verticalAlign: 3 }}>{rarityOf(id).label}</span> {m.name} 카드를 얻었어요!</h2>
             <p className="small">{ELEMENTS[els[0]].name}{els.length > 1 ? ' 외 ' + (els.length - 1) + '종류의 원자' : ''}가 실제로 만나서 만든 분자예요.</p>
             <button className="btn primary block" onClick={onClose}>컬렉션에 넣기</button>
           </div>

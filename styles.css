@@ -384,3 +384,19 @@ a.btn { text-decoration: none; color: inherit; display: inline-flex; align-items
 .caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: var(--accent); animation: caret 1s steps(2) infinite; }
 @keyframes caret { 50% { opacity: 0; } }
 .pair-chip { gap: 6px; padding: 3px 10px 3px 3px; }
+
+/* 카드 등급: 원자 수가 많을수록 레어 */
+.rarity { font: 700 11px var(--f-mono); letter-spacing: .04em; padding: 1px 7px; border-radius: 999px; color: #fff; text-shadow: 0 1px 1px rgb(0 0 0 / .35); }
+.rarity.r-bronze { background: linear-gradient(135deg, #8a5428, #c98a52); }
+.rarity.r-silver { background: linear-gradient(135deg, #7d868e, #b9c1c8); }
+.rarity.r-gold { background: linear-gradient(135deg, #a77412, #e4b43a); }
+.rarity.r-diamond { background: linear-gradient(135deg, #2a8fc0, #6fd0f2); }
+.rarity.r-rainbow { background: linear-gradient(90deg, #ff5f6d, #ffb347, #7bed9f, #4facfe, #a77bff); }
+.tcard-face.r-diamond, .tcard-face.r-rainbow, .dex.owned.r-diamond, .dex.owned.r-rainbow { background-size: 200% 200%; animation: foil-shift 6s linear infinite; }
+.tcard-face.r-rainbow, .dex.owned.r-rainbow { background: linear-gradient(115deg, #ff5f6d, #ffb347, #ffe66d, #7bed9f, #4facfe, #a77bff, #ff6ec7, #ff5f6d); background-size: 300% 300%; }
+.tcard-face.r-diamond::after, .tcard-face.r-rainbow::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: 18px;
+  background: radial-gradient(circle at 18% 12%, #fff 0 1.5px, transparent 2.5px), radial-gradient(circle at 82% 30%, #fff 0 1.5px, transparent 2.5px), radial-gradient(circle at 70% 88%, #fff 0 2px, transparent 3px), radial-gradient(circle at 10% 70%, #fff 0 1px, transparent 2px);
+  animation: twinkle 2.4s ease-in-out infinite; }
+@keyframes foil-shift { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+@keyframes twinkle { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tcard-face.r-diamond, .tcard-face.r-rainbow, .dex.owned.r-diamond, .dex.owned.r-rainbow, .tcard-face.r-diamond::after, .tcard-face.r-rainbow::after { animation: none; } }
