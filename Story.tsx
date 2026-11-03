@@ -88,7 +88,10 @@ export default function Story({ onSignup, onLogin, onSkip }: { onSignup: (answer
   const skipRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className={`story scene-${scene}`} role="dialog" aria-label="몰링크 시작 이야기">
+    <div className={`story scene-${scene}`} role="dialog" aria-label="몰링크 시작 이야기"
+      style={{ ['--story-bg' as string]: `url(${benUrl(scene === 'lab' ? 'ben-lab.webp' : scene === 'opening' ? 'ben-door-open.webp' : 'ben-door-closed.webp')})` }}>
+      {/* 넓은 화면(컴퓨터)에서는 휴대폰 비율 무대를 가운데 두고 양옆은 흐린 배경 */}
+      <div className="story-frame">
       <div className="story-top" ref={skipRef}>
         {onLogin && <button className="story-link" onClick={onLogin}>이미 계정이 있어요</button>}
         <button className="story-link" onClick={onSkip}>건너뛰기</button>
@@ -133,6 +136,7 @@ export default function Story({ onSignup, onLogin, onSkip }: { onSignup: (answer
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
