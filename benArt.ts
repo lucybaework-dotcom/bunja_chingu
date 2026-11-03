@@ -6,5 +6,5 @@ export const benUrl = (name: string) =>
 
 /** 처음 쓸 때 깜빡이지 않게 미리 받아 둔다 */
 export function preloadBen() {
-  for (const n of ['ben-normal.webp', 'ben-happy.webp', 'ben-think.webp', 'ben-surprise.webp', 'ben-lab.webp']) { const i = new Image(); i.src = benUrl(n); }
+  for (const n of ['ben-normal.webp', 'ben-happy.webp', 'ben-think.webp', 'ben-surprise.webp', 'ben-lab.webp', 'ben-door-closed.webp', 'ben-door-open.webp']) { const i = new Image(); i.src = benUrl(n); }
 }

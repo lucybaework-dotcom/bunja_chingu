@@ -73,7 +73,7 @@ export default function Story({ onSignup, onLogin, onSkip }: { onSignup: (answer
   const knock = () => {
     if (scene !== 'door') return;
     const k = knocks + 1; setKnocks(k);
-    if (k >= 2) { setTimeout(() => setScene('opening'), 700); setTimeout(() => setScene('lab'), 2100); }
+    if (k >= 2) { setTimeout(() => setScene('opening'), 800); setTimeout(() => setScene('lab'), 2600); }
   };
   const next = () => {
     if (!tw.done) { tw.finish(); return; }
@@ -96,9 +96,15 @@ export default function Story({ onSignup, onLogin, onSkip }: { onSignup: (answer
 
       {scene !== 'lab' && (
         <div className="hall" onClick={knock}>
-          <Door open={scene === 'opening'} />
-          <p className="hall-hint" aria-live="polite">{knocks === 0 ? '문을 두드려 보세요' : knocks === 1 ? '똑똑…' : scene === 'door' ? '???: 들어오게~' : ''}</p>
-          {knocks > 0 && <span key={knocks} className="knock-fx" aria-hidden="true">똑!</span>}
+          {/* 그림 비율 그대로 화면을 덮는 판. 명패 글자와 효과를 그림 위 같은 자리에 얹는다 */}
+          <div className={`hall-scene${knocks > 0 && scene === 'door' ? ' knocked' : ''}`} key={`k${knocks}`}>
+            <img className="hall-img" src={benUrl('ben-door-closed.webp')} alt="벤 교수 연구실 문" draggable={false} />
+            <img className={`hall-img open${scene === 'opening' ? ' on' : ''}`} src={benUrl('ben-door-open.webp')} alt="" draggable={false} />
+            <span className="hall-plate" aria-hidden="true">벤 교수<br />연구실</span>
+            {knocks > 0 && scene === 'door' && <span className="knock-fx" aria-hidden="true">똑!</span>}
+            {scene === 'door' && knocks === 0 && <span className="knock-ring" aria-hidden="true" />}
+          </div>
+          <p className="hall-hint" aria-live="polite">{knocks === 0 ? '문을 두드려 보세요' : knocks === 1 ? '똑똑… 한 번 더' : scene === 'door' ? '???: 들어오게~' : ''}</p>
           {scene === 'opening' && <div className="flash" aria-hidden="true" />}
         </div>
       )}
@@ -140,27 +146,6 @@ function ResultCard({ el }: { el: ElementId }) {
       <h2>{e.name} <span className="mono muted" style={{ fontSize: 18 }}>{e.symbol}</span></h2>
       <p className="small">{e.personality.split('.')[0]}.</p>
       <div className="row" style={{ gap: 6, justifyContent: 'center' }}>{e.strengths.slice(0, 2).map((x) => <span key={x} className="chip">{x}</span>)}</div>
-    </div>
-  );
-}
-
-function Door({ open }: { open: boolean }) {
-  return (
-    <div className="door-wrap">
-      <div className="door-light" aria-hidden="true" />
-      <svg className={`door${open ? ' open' : ''}`} viewBox="0 0 220 360" aria-label="벤 교수 연구실 문">
-        <rect x="4" y="4" width="212" height="352" rx="6" fill="#9b6a43" stroke="#5c3a20" strokeWidth="6" />
-        <rect x="28" y="34" width="164" height="110" rx="6" fill="#fff4d6" stroke="#5c3a20" strokeWidth="5" />
-        <rect x="28" y="34" width="164" height="110" rx="6" fill="url(#frost)" />
-        <defs><linearGradient id="frost" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffffff" stopOpacity=".7" /><stop offset="1" stopColor="#ffe9a8" stopOpacity=".3" /></linearGradient></defs>
-        <rect x="28" y="168" width="164" height="160" rx="6" fill="none" stroke="#7a4f2e" strokeWidth="4" />
-        <rect x="50" y="186" width="120" height="44" rx="6" fill="#f3efe6" stroke="#5c3a20" strokeWidth="3" />
-        <text x="110" y="205" textAnchor="middle" fontSize="15" fontWeight="700" fill="#3b3340">벤 교수 연구실</text>
-        <text x="110" y="222" textAnchor="middle" fontSize="11" fill="#6a5f6e">유기화학 · 노크 환영</text>
-        <circle cx="186" cy="262" r="9" fill="#e7c15a" stroke="#8a6a1c" strokeWidth="3" />
-        <polygon points="110,62 128,72 128,94 110,104 92,94 92,72" fill="none" stroke="#c89a3a" strokeWidth="4" opacity=".7" />
-        <circle cx="110" cy="83" r="9" fill="none" stroke="#c89a3a" strokeWidth="3" opacity=".7" />
-      </svg>
     </div>
   );
 }
