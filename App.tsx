@@ -520,6 +520,7 @@ function Home() {
   const busy = commit.rooms.length > 0 || commit.queued || !!me.suspendedAt || !me.nickname;
   const { pending } = myCards(s, viewer);
   const [nick, setNick] = useState('');
+  const [make, setMake] = useState(false);
   const auto = async () => {
     const r = await run({ type: 'startAutoMatch', actor: viewer });
     if (!r.ok) return;
@@ -560,22 +561,52 @@ function Home() {
           ))}
         </div>
       )}
-      <div className="stack-s">
-        <button className="btn primary block" disabled={busy} onClick={auto}>자동 매칭 시작</button>
-        <div className="row">
-          <button className="btn grow" onClick={() => go({ k: 'rooms' })}>실험실 직접 찾기</button>
-          <button className="btn grow" onClick={() => go({ k: 'nearby' })}>내 주변 원자 찾기</button>
+      {/* 지금 상태에 맞는 큰 버튼 하나 */}
+      {commit.queued ? (
+        <div className="panel home-status">
+          <span className="pulse"><Atom el={el} size={44} /></span>
+          <div className="stack-s grow" style={{ gap: 2 }}><strong>나와 맞는 원자를 찾는 중</strong><span className="small muted">모이면 바로 알려 드려요</span></div>
+          <button className="btn sm" onClick={() => go({ k: 'auto' })}>보기</button>
         </div>
-        <button className="btn ghost block" onClick={() => go({ k: 'stats' })}>우리 학교 원소 분포 보기</button>
-        {commit.queued && <button className="btn ghost block" onClick={() => go({ k: 'auto' })}>자동 매칭 대기 중 · 상태 보기</button>}
-        {!commit.queued && commit.rooms.length > 0 && !conflict && <p className="small muted">모집 중인 실험실은 한 곳만 참여할 수 있어요.</p>}
-      </div>
+      ) : commit.rooms.length > 0 && !conflict ? (
+        <button className="panel home-status" onClick={() => go({ k: 'room', id: commit.rooms[0] })}>
+          <span className="pulse"><Atom el={el} size={44} /></span>
+          <span className="stack-s grow" style={{ gap: 2, textAlign: 'left' }}><strong>‘{roomTitle(s.rooms[commit.rooms[0]])}’ 모집 중</strong><span className="small muted">눌러서 실험실로 가기</span></span>
+        </button>
+      ) : (
+        <button className="make-btn" disabled={busy} onClick={() => setMake(true)}>
+          <span className="make-ic" aria-hidden="true"><Atom el="H" size={26} /><Atom el={el} size={36} /><Atom el="O" size={26} /></span>
+          <span className="stack-s" style={{ gap: 0, textAlign: 'left' }}><strong>분자 만들기</strong><span className="small">친구들을 모아 분자를 완성해요</span></span>
+        </button>
+      )}
       <section className="stack">
-        <div className="section-title"><h2>참여 중인 실험실</h2><span className="mono small muted">{myRooms.length}</span></div>
-        {myRooms.length === 0 && <div className="panel flat"><p className="muted small">아직 없어요.</p></div>}
+        <div className="section-title"><h2>내 실험실</h2>{myRooms.length > 0 && <span className="mono small muted">{myRooms.length}</span>}</div>
+        {myRooms.length === 0 && <div className="panel flat"><p className="muted small">아직 없어요. 위의 <strong>분자 만들기</strong>로 시작해 보세요.</p></div>}
         {myRooms.map((r) => <RoomCard key={r.id} room={r} compact />)}
       </section>
-      <button className="btn ghost block" onClick={() => go({ k: 'collection' })}>내 분자 도감 · {myCards(s, viewer).owned.size}/{USABLE().length}</button>
+      {make && (
+        <div className="sheet-bg" onClick={() => setMake(false)}>
+          <div className="sheet make-sheet" role="dialog" aria-label="분자 만들기" onClick={(e) => e.stopPropagation()}>
+            <div className="row between"><h2>어떻게 모일까요?</h2><button className="btn sm" onClick={() => setMake(false)}>닫기</button></div>
+            <button className="make-opt best" onClick={() => { setMake(false); void auto(); }}>
+              <span className="make-opt-ic" aria-hidden="true">✨</span>
+              <span className="stack-s grow" style={{ gap: 2 }}><strong>알아서 맺어 줘요 <span className="chip on">추천</span></strong><span className="small muted">나와 맞는 원자들을 찾아 실험실을 열어 줘요</span></span>
+            </button>
+            <button className="make-opt" onClick={() => { setMake(false); go({ k: 'rooms' }); }}>
+              <span className="make-opt-ic" aria-hidden="true">🔍</span>
+              <span className="stack-s grow" style={{ gap: 2 }}><strong>모집 중인 실험실 들어가기</strong><span className="small muted">다른 사람이 연 모임에 참여해요</span></span>
+            </button>
+            <button className="make-opt" onClick={() => { setMake(false); go({ k: 'create' }); }}>
+              <span className="make-opt-ic" aria-hidden="true">🧪</span>
+              <span className="stack-s grow" style={{ gap: 2 }}><strong>내가 실험실 열기</strong><span className="small muted">방장이 돼요. 교수님이 분자를 골라 줘요</span></span>
+            </button>
+            <button className="make-opt" onClick={() => { setMake(false); go({ k: 'nearby' }); }}>
+              <span className="make-opt-ic" aria-hidden="true">📍</span>
+              <span className="stack-s grow" style={{ gap: 2 }}><strong>근처에서 찾기</strong><span className="small muted">캠퍼스에서 지금 가까운 실험실</span></span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -635,22 +666,26 @@ function RoomsList() {
     .sort((a, b) => sort === 'soon' ? (a.meetAt ?? Infinity) - (b.meetAt ?? Infinity) || b.createdAt - a.createdAt
       : sort === 'full' ? fill(b) - fill(a) || b.createdAt - a.createdAt : b.createdAt - a.createdAt);
   const filtered = today || size > 0;
+  const [showFilters, setShowFilters] = useState(false);
   const el = s.users[viewer].elementId!;
   return (
     <div className="stack">
       <div className="row between"><h1>실험실</h1><button className="btn primary sm" onClick={() => go({ k: 'create' })}>새 실험실 열기</button></div>
       <div className="seg" role="tablist">
-        <button role="tab" aria-selected={tab === 'mine'} className={tab === 'mine' ? 'on' : ''} onClick={() => setTab('mine')}>{ELEMENTS[el].name} 자리 있는 실험실 {joinable.length}</button>
-        <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>모집 중 전체 {all.length}</button>
+        <button role="tab" aria-selected={tab === 'mine'} className={tab === 'mine' ? 'on' : ''} onClick={() => setTab('mine')}>내 자리 있는 곳 {joinable.length}</button>
+        <button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'on' : ''} onClick={() => setTab('all')}>전체 {all.length}</button>
       </div>
-      <div className="filters">
+      <button className="linkish small" style={{ alignSelf: 'flex-start' }} onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}>
+        {showFilters ? '조건 닫기' : `조건${filtered || sort !== 'new' ? ' (적용 중)' : ''} ▾`}
+      </button>
+      {showFilters && <div className="filters">
         <label className="sr-only" htmlFor="room-sort">정렬</label>
         <select id="room-sort" className="input sm" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
           <option value="new">최근에 열린 순</option><option value="soon">모이는 시각 빠른 순</option><option value="full">거의 다 찬 순</option>
         </select>
         <button className={`chip pick${today ? ' on' : ''}`} aria-pressed={today} onClick={() => setToday(!today)}>오늘 모임</button>
         {[2, 3, 4, 5, 6].map((n) => <button key={n} className={`chip pick${size === n ? ' on' : ''}`} aria-pressed={size === n} onClick={() => setSize(size === n ? 0 : n)}>{n}명</button>)}
-      </div>
+      </div>}
       {list.length === 0 && filtered && <div className="panel flat"><p className="small muted">조건에 맞는 실험실이 없어요.</p><button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => { setToday(false); setSize(0); }}>필터 지우기</button></div>}
       {list.length === 0 && !filtered && <div className="panel flat"><p className="small muted">지금은 {tab === 'mine' ? `${ELEMENTS[el].name} 자리가 남은 실험실이 없어요.` : '모집 중인 실험실이 없어요.'}</p></div>}
       {list.map((r) => <RoomCard key={r.id} room={r} />)}
@@ -838,10 +873,15 @@ function RoomDetail({ id }: { id: string }) {
           {r.origin === 'automatic' && <span className="chip">자동 매칭 실험실</span>}
         </div>
       </div>
-      {member && r.hostId === viewer && !r.closedAt && <RoomInfoEditor room={r} />}
       {member && <ClaimPanel room={r} />}
       {member && <PlaceCard room={r} isHost={r.hostId === viewer} run={run} viewer={viewer} />}
-      {member && r.hostId === viewer && !r.closedAt && r.firstMeetingConfirmedAt === null && <LocationShare />}
+      {member && r.hostId === viewer && !r.closedAt && (
+        <details className="panel host-menu" open={!r.name}>
+          <summary><strong>방장 메뉴</strong> <span className="small muted">이름·시각 바꾸기, 위치 공유</span></summary>
+          <RoomInfoEditor room={r} />
+          {r.firstMeetingConfirmedAt === null && <LocationShare />}
+        </details>
+      )}
       {r.originalMoleculeId !== r.targetMoleculeId && <p className="small muted">처음 목표는 {molName(r.originalMoleculeId)}였어요.</p>}
       {r.firstMeetingConfirmedAt && (
         <p className="small">첫 만남 결과: {r.firstMeetingMoleculeId ? <strong>{molName(r.firstMeetingMoleculeId)} 카드 획득</strong> : '유효한 분자가 아니어서 카드 없이 기록만 남았어요'}</p>
