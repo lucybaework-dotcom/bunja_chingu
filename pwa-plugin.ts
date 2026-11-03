@@ -1,6 +1,7 @@
 // 홈 화면 앱(PWA) 파일을 빌드 때 만들어 낸다: manifest, 아이콘, 서비스 워커. 폴더를 따로 올리지 않아도 되게.
 import type { Plugin } from 'vite';
 import { ICONS } from './pwa-icons';
+import { BEN_ART } from './ben-assets';
 
 const MANIFEST = {
   name: '몰링크', short_name: '몰링크', description: '나를 닮은 원소로, 분자처럼 모여요',
@@ -67,7 +68,7 @@ export function pwaPlugin(): Plugin {
     },
     generateBundle() {
       if (demo) return;
-      for (const [fileName, b64] of Object.entries(ICONS)) this.emitFile({ type: 'asset', fileName, source: Buffer.from(b64, 'base64') });
+      for (const [fileName, b64] of Object.entries({ ...ICONS, ...BEN_ART })) this.emitFile({ type: 'asset', fileName, source: Buffer.from(b64, 'base64') });
       this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: JSON.stringify(MANIFEST, null, 2) });
       this.emitFile({ type: 'asset', fileName: 'sw.js', source: SW });
       this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ build }) });

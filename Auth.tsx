@@ -6,6 +6,7 @@ import { supabase, supabaseTransport } from './supabase';
 import App from './App';
 import { lastKnown } from './geo';
 import { Atom } from './bits';
+import Story, { markStorySeen, savePendingQuiz, storySeen } from './Story';
 
 const KO: [RegExp, string][] = [
   [/Invalid login credentials/i, '이메일이나 비밀번호가 맞지 않아요.'],
@@ -22,6 +23,9 @@ export default function AuthGate() {
   const [backend, setBackend] = useState<RemoteBackend | null>(null);
   const [loadErr, setLoadErr] = useState('');
   const [notice, setNotice] = useState('');
+  // 처음 온 사람은 벤 교수님 연구실 이야기부터
+  const [story, setStory] = useState(() => !storySeen());
+  const [loginMode, setLoginMode] = useState<'in' | 'up'>('in');
 
   useEffect(() => {
     const sb = supabase();
@@ -53,7 +57,11 @@ export default function AuthGate() {
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (session === undefined) return <Center>불러오는 중…</Center>;
-  if (!session) return <Login notice={notice} />;
+  if (!session && story) return <Story
+    onSignup={(a) => { savePendingQuiz(a); markStorySeen(); setLoginMode('up'); setStory(false); }}
+    onLogin={() => { markStorySeen(); setLoginMode('in'); setStory(false); }}
+    onSkip={() => { markStorySeen(); setLoginMode('up'); setStory(false); }} />;
+  if (!session) return <Login notice={notice} initialMode={loginMode} onReplay={() => setStory(true)} />;
   if (loadErr) return (
     <Center>
       <p>{loadErr}</p>
@@ -69,8 +77,8 @@ function Center({ children }: { children: React.ReactNode }) {
   return <div className="shell" style={{ alignItems: 'center', textAlign: 'center', paddingTop: 80 }}><div className="stack" style={{ alignItems: 'center' }}>{children}</div></div>;
 }
 
-function Login({ notice }: { notice?: string }) {
-  const [mode, setMode] = useState<'in' | 'up'>('in');
+function Login({ notice, initialMode = 'in', onReplay }: { notice?: string; initialMode?: 'in' | 'up'; onReplay?: () => void }) {
+  const [mode, setMode] = useState<'in' | 'up'>(initialMode);
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [msg, setMsg] = useState<{ t: string; err?: boolean } | null>(null);
@@ -109,7 +117,7 @@ function Login({ notice }: { notice?: string }) {
         <button className="btn primary block" disabled={busy}>{busy ? '잠시만요…' : mode === 'in' ? '로그인' : '가입하기'}</button>
         {msg && <p className="small" style={{ color: msg.err ? 'var(--bad)' : 'var(--ok)' }} role="status">{msg.t}</p>}
       </form>
-      <p className="small muted">이메일은 다른 학생에게 보이지 않아요. <a href="#demo" onClick={() => setTimeout(() => location.reload(), 0)}>가상 사용자로 먼저 둘러보기</a></p>
+      <p className="small muted">이메일은 다른 학생에게 보이지 않아요. <a href="#demo" onClick={() => setTimeout(() => location.reload(), 0)}>가상 사용자로 먼저 둘러보기</a>{onReplay && <> · <button type="button" className="linkish small" onClick={onReplay}>벤 교수님 다시 만나기</button></>}</p>
     </div>
   );
 }

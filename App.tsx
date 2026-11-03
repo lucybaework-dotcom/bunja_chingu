@@ -4,6 +4,7 @@ import { j, josaOf } from './josa';
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ELEMENTS, METAPHOR_NOTICE, pairContent } from './elements';
 import { Professor, PROF } from './Professor';
+import Story, { clearPendingQuiz, readPendingQuiz, savePendingQuiz } from './Story';
 import { AI_LIMITS, type AiReply, type AiTurn } from './advisor';
 import { ROOM_REQ_MAX, type RoomAdvice } from './roomAdvisor';
 import { kindLabel, moleculeById, type ElementId } from './molecules';
@@ -82,6 +83,7 @@ export default function App({ backend }: { backend: Backend }) {
   const [reveal, setReveal] = useState<string | null>(null);
   const [reviewOf, setReviewOf] = useState<string | null>(null);
   const [guide, setGuide] = useState(false);
+  const [storyDone, setStoryDone] = useState(false);
 
   // 버튼을 누르면 튕기는 효과 (동작 줄이기 설정이면 끔)
   useEffect(() => {
@@ -118,12 +120,21 @@ export default function App({ backend }: { backend: Backend }) {
     const open = () => { const m = /^#room-(.+)$/.exec(location.hash); if (m && s.rooms[m[1]]) { go({ k: 'room', id: m[1] }); history.replaceState(null, '', location.pathname + location.search); } };
     open(); window.addEventListener('hashchange', open); return () => window.removeEventListener('hashchange', open);
   }, [!!s.rooms]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!me || me.deletedAt) body = <Intro onStart={async () => { const r = await run({ type: 'createUser', intro: '', makeMe: true, consentVersion: TERMS_VERSION }); if (r.ok) setViewer(r.createdId!); }} />;
+  const showStory = (!me || me.deletedAt) && backend.mode === 'demo' && !storyDone;
+  if (!me || me.deletedAt) body = <Intro compact={!!readPendingQuiz()} onStart={async () => {
+    const r = await run({ type: 'createUser', intro: '', makeMe: true, consentVersion: TERMS_VERSION });
+    if (!r.ok) return;
+    setViewer(r.createdId!);
+    // 벤 교수님 이야기에서 답한 질문이 있으면 바로 결과로
+    const pending = readPendingQuiz();
+    if (pending) { const q = await run({ type: 'recordQuiz', actor: r.createdId!, answers: pending }); if (q.ok) clearPendingQuiz(); }
+  }} />;
   else if (!me.elementLockedAt) body = <Onboarding />;
   else body = <Screen />;
   const onboarded = !!me?.elementLockedAt;
   // 처음 원소를 정한 뒤 한 번 사용 안내를 보여 준다
   useEffect(() => { if (onboarded && !me?.virtual && !guideSeen()) { markGuideSeen(); setGuide(true); } }, [onboarded]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (showStory) return <Story onSignup={(a) => { savePendingQuiz(a); setStoryDone(true); }} onSkip={() => setStoryDone(true)} />;
 
   return (
     <C.Provider value={{ s, viewer: vid ?? '', run, go, view, backend, now,
@@ -221,8 +232,15 @@ function NotifBell() {
 }
 
 // ───────── 1. 소개 ─────────
-function Intro({ onStart }: { onStart: () => void }) {
+function Intro({ onStart, compact }: { onStart: () => void; compact?: boolean }) {
   const [ok, setOk] = useState(false);
+  if (compact) return (
+    <div className="stack" style={{ gap: 18, paddingTop: 12 }}>
+      <div className="row" style={{ gap: 12, flexWrap: 'nowrap' }}><Professor size={56} mood="happy" /><div className="bubble prof-ask">홍홍~ 마지막으로 이것만 동의해 주게!</div></div>
+      <ConsentChecks onChange={setOk} />
+      <button className="btn primary block" disabled={!ok} onClick={onStart}>{ok ? '동의하고 내 원소 보기' : '필수 항목에 동의해 주세요'}</button>
+    </div>
+  );
   return (
     <div className="stack" style={{ gap: 20 }}>
       <section className="hero">
@@ -258,6 +276,9 @@ function Onboarding() {
   const { s, viewer, run } = useApp();
   const attempts = s.quizAttempts.filter((a) => a.userId === viewer);
   const [phase, setPhase] = useState<'pick' | 'quiz' | 'ai' | 'choose'>(attempts.length ? 'choose' : 'pick');
+  // 벤 교수님 이야기에서 답한 결과가 가입 직후 기록되면 바로 결과 화면으로
+  const startedEmpty = useRef(attempts.length === 0);
+  useEffect(() => { if (startedEmpty.current && attempts.length > 0) { startedEmpty.current = false; if (phase === 'pick') setPhase('choose'); } }, [attempts.length]); // eslint-disable-line react-hooks/exhaustive-deps
   if (phase === 'pick') return <FindWay onAi={() => setPhase('ai')} onQuiz={() => setPhase('quiz')} onBack={attempts.length ? () => setPhase('choose') : undefined} />;
   if (phase === 'ai') return <AiAdvisor onDone={() => setPhase('choose')} onQuiz={() => setPhase('quiz')} />;
   if (phase === 'quiz') return <Quiz onDone={async (answers) => { const r = await run({ type: 'recordQuiz', actor: viewer, answers }); if (r.ok) setPhase('choose'); }} onSkip={attempts.length ? () => setPhase('choose') : undefined} />;
