@@ -4,6 +4,7 @@ import { j, josaOf } from './josa';
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ELEMENTS, METAPHOR_NOTICE, pairContent } from './elements';
 import { Professor, PROF } from './Professor';
+import { balancePick, type Stats } from './balance';
 import Story, { clearPendingQuiz, readPendingQuiz, savePendingQuiz } from './Story';
 import { AI_LIMITS, type AiReply, type AiTurn } from './advisor';
 import { ROOM_REQ_MAX, type RoomAdvice } from './roomAdvisor';
@@ -13,7 +14,7 @@ import type { Backend, DispatchResult } from './backend';
 import { countsOf, exactMatches, moleculesWith, supersetCandidates, usableElements, vacancies } from './chemistry';
 import {
   activeMembers, canChat, getProfile, hasConflict, INTRO_MAX, isMember, isRecruitingOpen, joinableRoomsFor, openProposal, pendingMeeting,
-  recruitingCommitments, roomCounts, roomTitle, ROOM_NAME_MAX, TERMS_VERSION, waitingEntry, type Command,
+  recruitingCommitments, roomCounts, roomTitle, ROOM_NAME_MAX, TERMS_VERSION, waitingEntry, elementStats, type Command,
 } from './engine';
 import type { MeetingRecord, Room, State } from './types';
 import { USABLE } from './molecules';
@@ -134,7 +135,7 @@ export default function App({ backend }: { backend: Backend }) {
   const onboarded = !!me?.elementLockedAt;
   // 처음 원소를 정한 뒤 한 번 사용 안내를 보여 준다
   useEffect(() => { if (onboarded && !me?.virtual && !guideSeen()) { markGuideSeen(); setGuide(true); } }, [onboarded]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (showStory) return <Story onSignup={(a) => { savePendingQuiz(a); setStoryDone(true); }} onSkip={() => setStoryDone(true)} />;
+  if (showStory) return <Story stats={elementStats(s)} onSignup={(a) => { savePendingQuiz(a); setStoryDone(true); }} onSkip={() => setStoryDone(true)} />;
 
   return (
     <C.Provider value={{ s, viewer: vid ?? '', run, go, view, backend, now,
@@ -143,7 +144,7 @@ export default function App({ backend }: { backend: Backend }) {
         <header className="topbar">
           <button className="brand" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => go({ k: 'home' })}>
             <span className="brand-mark" aria-hidden="true"><Atom el="H" size={20} /><span className="bond" style={{ width: 8, height: 3, background: 'var(--ink-2)', display: 'inline-block' }} /><Atom el="O" size={24} /></span>
-            몰링크
+            분자친구
           </button>
           {onboarded && <NotifBell />}
         </header>
@@ -444,8 +445,12 @@ function Choose({ onRetake }: { onRetake: () => void }) {
   const { s, viewer, run, go } = useApp();
   const last = s.quizAttempts.filter((a) => a.userId === viewer).at(-1)!;
   const isAi = !!last.aiRanking?.length;
-  const ranking = useMemo(() => isAi ? [...last.aiRanking!, ...usableElements().filter((e) => !last.aiRanking!.includes(e))] : scoreQuiz(last.answers, usableElements()).ranking, [last, isAi]);
-  const [sel, setSel] = useState<ElementId>(last.recommended);
+  const quiz = useMemo(() => (isAi ? null : scoreQuiz(last.answers, usableElements())), [last, isAi]);
+  const ranking = useMemo(() => isAi ? [...last.aiRanking!, ...usableElements().filter((e) => !last.aiRanking!.includes(e))] : quiz!.ranking, [last, isAi, quiz]);
+  // 너무 많은 원소면 성향이 비슷하고 덜 붐비는 원소를 추천
+  const bal = useMemo(() => balancePick(ranking, (s as State & { stats?: Stats }).stats ?? elementStats(s), quiz?.scores), [ranking, quiz]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rec = bal.pick;
+  const [sel, setSel] = useState<ElementId>(rec);
   const [confirming, setConfirming] = useState(false);
   const [ack, setAck] = useState(false);
   const [intro, setIntro] = useState(s.users[viewer].intro);
@@ -463,13 +468,15 @@ function Choose({ onRetake }: { onRetake: () => void }) {
     <div className="stack" style={{ gap: 18 }}>
       <div className="stack-s">
         <span className="eyebrow">{isAi ? `${PROF.name} 상담 결과` : '테스트 결과'}</span>
-        <h1>추천 원소는 {j(ELEMENTS[last.recommended].name, '이에요/예요')}</h1>
-        <p className="muted small">추천과 달라도 괜찮아요.</p>
+        <h1>추천 원소는 {j(ELEMENTS[rec].name, '이에요/예요')}</h1>
+        {bal.swapped
+          ? <p className="small balance-note">가장 잘 맞는 건 <strong>{ELEMENTS[bal.original].name}</strong>인데, 지금 너무 많아서 성향이 비슷한 {j(ELEMENTS[rec].name, '을/를')} 추천해요. 매칭이 더 빨라요. {ELEMENTS[bal.original].name}도 고를 수 있어요.</p>
+          : <p className="muted small">추천과 달라도 괜찮아요.</p>}
       </div>
       <div className="el-tabs" role="tablist">
         {ranking.map((el) => (
           <button key={el} role="tab" aria-selected={sel === el} className={`el-tab${sel === el ? ' sel' : ''}`} onClick={() => { setSel(el); setConfirming(false); }}>
-            <Atom el={el} size={34} /><span>{ELEMENTS[el].name}</span>{el === last.recommended ? <span className="rec">추천</span> : isAi && last.aiRanking!.includes(el) ? <span className="rec alt">{last.aiRanking!.indexOf(el) + 1}위</span> : null}
+            <Atom el={el} size={34} /><span>{ELEMENTS[el].name}</span>{el === rec ? <span className="rec">추천</span> : bal.swapped && el === bal.original ? <span className="rec alt">많아요</span> : isAi && last.aiRanking!.includes(el) ? <span className="rec alt">{last.aiRanking!.indexOf(el) + 1}위</span> : null}
           </button>
         ))}
       </div>
@@ -982,8 +989,10 @@ function MeetingPanel({ room }: { room: Room }) {
   const mems = activeMembers(s, room.id);
   const [picking, setPicking] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [sel, setSel] = useState<string[]>(mems.map((m) => m.userId));
+  // 고른 참석자. 아직 손대지 않았으면 지금 실험실에 있는 모두 (화면을 연 뒤 들어온 사람도 포함)
+  const [picked, setSel] = useState<string[] | null>(null);
   if (room.closedAt || room.firstMeetingConfirmedAt || room.recruitment !== 'complete') return null;
+  const sel = (picked ?? mems.map((m) => m.userId)).filter((id) => mems.some((m) => m.userId === id));
   const preview = exactMatches(countsOf(mems.filter((m) => sel.includes(m.userId)).map((m) => m.elementSnapshot)))[0];
   const toggle = (id: string) => setSel(sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
   return (
@@ -1012,7 +1021,7 @@ function MeetingPanel({ room }: { room: Room }) {
               }}>{locating ? '위치 확인 중…' : '실제로 만났어요'}</button>
             </div>
           )}
-          {isHost && <button className="btn ghost sm" onClick={() => { setSel(pm.attendees.map((a) => a.userId)); setPicking(true); }}>참석자 수정 (기존 확인은 다시 받아요)</button>}
+          {isHost && <button className="btn ghost sm" onClick={() => { setSel(null); setPicking(true); }}>참석자 수정 (기존 확인은 다시 받아요)</button>}
         </>
       ) : isHost && (!pm || picking) ? (
         <>
@@ -1029,7 +1038,7 @@ function MeetingPanel({ room }: { room: Room }) {
           <p className="small">판정: {sel.length < 2 ? '두 명 이상 골라 주세요.' : preview ? <strong>{molName(preview.id)} · 카드 지급 대상</strong> : '유효한 분자가 아니에요 · 카드 없이 기록만'}</p>
           <div className="row">
             {picking && <button className="btn ghost" onClick={() => setPicking(false)}>취소</button>}
-            <button className="btn primary grow" disabled={sel.length < 2} onClick={async () => { const r = await run({ type: 'proposeMeeting', actor: viewer, roomId: room.id, attendeeIds: sel }, '참석 확인을 요청했어요.'); if (r.ok) setPicking(false); }}>참석자에게 확인 요청</button>
+            <button className="btn primary grow" disabled={sel.length < 2} onClick={async () => { const r = await run({ type: 'proposeMeeting', actor: viewer, roomId: room.id, attendeeIds: sel }, '참석 확인을 요청했어요.'); if (r.ok) { setPicking(false); setSel(null); } }}>참석자 {sel.length}명에게 확인 요청</button>
           </div>
         </>
       ) : (

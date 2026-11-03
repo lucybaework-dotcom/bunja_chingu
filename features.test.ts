@@ -214,3 +214,24 @@ describe('서버: 관리자 메일', () => {
     expect(sneaky.body.ok).toBe(false);
   });
 });
+
+describe('여럿이 만날 때 만남 확인', () => {
+  it('5명 모두 확인할 수 있다 (GPS가 조금씩 흩어져도)', () => {
+    const x = h(); const c = x.user('C'); const hs = [x.user('H'), x.user('H'), x.user('H'), x.user('H')];
+    const r = x.room(c, 'ch4'); for (const u of hs) x.run({ type: 'joinRoom', actor: u, roomId: r });
+    const all = [c, ...hs];
+    const m = x.run({ type: 'proposeMeeting', actor: c, roomId: r, attendeeIds: all }).createdId!;
+    const spots = [at(0, 0), at(70, 0), at(0, 70), at(-40, -40), at(35, 35)];
+    all.forEach((u, i) => x.run({ type: 'respondMeeting', actor: u, meetingId: m, response: 'confirm', loc: spots[i] }));
+    expect(x.s.meetings.find((q) => q.id === m)!.status).toBe('confirmed');
+    expect(x.s.records.filter((q) => q.meetingId === m).length).toBe(5);
+  });
+  it('혼자 멀리 있으면 여전히 막는다', () => {
+    const x = h(); const c = x.user('C'); const hs = [x.user('H'), x.user('H'), x.user('H'), x.user('H')];
+    const r = x.room(c, 'ch4'); for (const u of hs) x.run({ type: 'joinRoom', actor: u, roomId: r });
+    const m = x.run({ type: 'proposeMeeting', actor: c, roomId: r, attendeeIds: [c, ...hs] }).createdId!;
+    x.run({ type: 'respondMeeting', actor: c, meetingId: m, response: 'confirm', loc: at(0, 0) });
+    x.run({ type: 'respondMeeting', actor: hs[0], meetingId: m, response: 'confirm', loc: at(30, 0) });
+    expect(x.err({ type: 'respondMeeting', actor: hs[1], meetingId: m, response: 'confirm', loc: at(400, 0) })).toMatch(/떨어져/);
+  });
+});

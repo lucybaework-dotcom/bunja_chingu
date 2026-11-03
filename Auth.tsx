@@ -7,6 +7,7 @@ import App from './App';
 import { lastKnown } from './geo';
 import { Atom } from './bits';
 import Story, { markStorySeen, savePendingQuiz, storySeen } from './Story';
+import type { Stats } from './balance';
 
 const KO: [RegExp, string][] = [
   [/Invalid login credentials/i, '이메일이나 비밀번호가 맞지 않아요.'],
@@ -26,6 +27,8 @@ export default function AuthGate() {
   // 처음 온 사람은 벤 교수님 연구실 이야기부터
   const [story, setStory] = useState(() => !storySeen());
   const [loginMode, setLoginMode] = useState<'in' | 'up'>('in');
+  const [stats, setStats] = useState<Stats | null>(null);
+  useEffect(() => { if (story) supabaseTransport().call({ action: 'publicStats' }).then((r) => { if (r.json.stats) setStats(r.json.stats as Stats); }).catch(() => undefined); }, [story]);
 
   useEffect(() => {
     const sb = supabase();
@@ -57,7 +60,7 @@ export default function AuthGate() {
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (session === undefined) return <Center>불러오는 중…</Center>;
-  if (!session && story) return <Story
+  if (!session && story) return <Story stats={stats}
     onSignup={(a) => { savePendingQuiz(a); markStorySeen(); setLoginMode('up'); setStory(false); }}
     onLogin={() => { markStorySeen(); setLoginMode('in'); setStory(false); }}
     onSkip={() => { markStorySeen(); setLoginMode('up'); setStory(false); }} />;
@@ -101,7 +104,7 @@ function Login({ notice, initialMode = 'in', onReplay }: { notice?: string; init
           <Atom el="O" size={56} /><span className="bond" style={{ width: 20, height: 4, background: 'var(--ink-2)' }} />
           <Atom el="H" size={40} />
         </div>
-        <h1>몰링크</h1>
+        <h1>분자친구</h1>
         <p className="muted">나를 닮은 원소로, 실제 분자만큼 모여 친구가 돼요.</p>
       </section>
       {notice && !msg && <div className="panel warn"><p className="small">{notice}</p></div>}

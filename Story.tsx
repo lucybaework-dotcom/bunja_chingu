@@ -5,6 +5,8 @@ import { ELEMENTS } from './elements';
 import type { ElementId } from './molecules';
 import { QUESTIONS, scoreQuiz } from './quiz';
 import { usableElements } from './chemistry';
+import { balancePick, type Stats } from './balance';
+import { josaOf } from './josa';
 import { Atom } from './bits';
 import { BenSprite, type BenMood } from './BenSprite';
 import { elementColor } from './colors';
@@ -23,7 +25,7 @@ const OPENING: Line[] = [
   { who: '벤 교수', text: '홍홍~ 나는 유기화학 연구실의 벤 교수일세.', mood: 'happy' },
   { who: '벤 교수', text: '그래 자네, 대학원에 오고 싶은가?', mood: 'normal', choices: ['아니오'] },
   { who: '벤 교수', text: '…그, 그렇구만. 그럼 친구라도 만들어 보는 건 어떤가?', mood: 'think', choices: ['좋아요'] },
-  { who: '벤 교수', text: '홍홍~ 좋네! 몰링크에선 모두가 원소 하나가 된다네.', mood: 'happy' },
+  { who: '벤 교수', text: '홍홍~ 좋네! 분자친구에선 모두가 원소 하나가 된다네.', mood: 'happy' },
   { who: '벤 교수', text: '물(H₂O)처럼, 진짜 분자 모양대로 2~6명이 실험실에 모이는 거지.', mood: 'normal' },
   { who: '벤 교수', text: '실험실에서 이야기하고, 실제로 만나면 분자 카드를 받는다네~', mood: 'happy' },
   { who: '벤 교수', text: '자 그럼, 자네는 어떤 원소인가? 몇 가지만 물어보겠네.', mood: 'think' },
@@ -52,7 +54,7 @@ function useTypewriter(text: string) {
   return { shown: text.slice(0, n), done: n >= text.length, finish: () => setN(text.length) };
 }
 
-export default function Story({ onSignup, onLogin, onSkip }: { onSignup: (answers: Record<string, number>) => void; onLogin?: () => void; onSkip: () => void }) {
+export default function Story({ onSignup, onLogin, onSkip, stats }: { onSignup: (answers: Record<string, number>) => void; onLogin?: () => void; onSkip: () => void; stats?: Stats | null }) {
   const [scene, setScene] = useState<'door' | 'opening' | 'lab'>(reduce() ? 'lab' : 'door');
   const [knocks, setKnocks] = useState(0);
   useEffect(() => { preloadBen(); }, []);
@@ -60,14 +62,19 @@ export default function Story({ onSignup, onLogin, onSkip }: { onSignup: (answer
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const qIndex = step - OPENING.length;
   const inQuiz = qIndex >= 0 && qIndex < QUESTIONS.length;
-  const result = qIndex >= QUESTIONS.length ? scoreQuiz(answers, usableElements()).recommended : null;
+  const quiz = qIndex >= QUESTIONS.length ? scoreQuiz(answers, usableElements()) : null;
+  // 너무 많은 원소면 비슷하고 덜 붐비는 원소로
+  const bal = quiz ? balancePick(quiz.ranking, stats, quiz.scores) : null;
+  const result = bal ? bal.pick : null;
 
   let line: Line;
   if (step < OPENING.length) line = OPENING[step];
   else if (inQuiz) {
     const q = QUESTIONS[qIndex];
     line = { who: '벤 교수', text: `${qIndex > 0 && qIndex % 3 === 0 ? REACT[qIndex % REACT.length] + ' ' : ''}${q.text}…?`, mood: qIndex % 4 === 2 ? 'think' : 'normal', choices: q.options.map((o) => o.text) };
-  } else line = { who: '벤 교수', text: `홍홍~ 자네는 ${LIKE[result!]} 같은 사람이구만~`, mood: 'happy' };
+  } else line = bal!.swapped
+    ? { who: '벤 교수', text: `홍홍~ 자네는 ${LIKE[bal!.original]} 같은 사람이구만~ 그런데 요즘 ${ELEMENTS[bal!.original].name}${josaOf(ELEMENTS[bal!.original].name, '이/가')} 너무 많다네. 비슷한 ${ELEMENTS[result!].name}${josaOf(ELEMENTS[result!].name, '은/는')} 어떤가?`, mood: 'happy' }
+    : { who: '벤 교수', text: `홍홍~ 자네는 ${LIKE[result!]} 같은 사람이구만~`, mood: 'happy' };
 
   const tw = useTypewriter(scene === 'lab' ? line.text : '');
   const knock = () => {
@@ -88,7 +95,7 @@ export default function Story({ onSignup, onLogin, onSkip }: { onSignup: (answer
   const skipRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className={`story scene-${scene}`} role="dialog" aria-label="몰링크 시작 이야기"
+    <div className={`story scene-${scene}`} role="dialog" aria-label="분자친구 시작 이야기"
       style={{ ['--story-bg' as string]: `url(${benUrl(scene === 'lab' ? 'ben-lab.webp' : scene === 'opening' ? 'ben-door-open.webp' : 'ben-door-closed.webp')})` }}>
       {/* 넓은 화면(컴퓨터)에서는 휴대폰 비율 무대를 가운데 두고 양옆은 흐린 배경 */}
       <div className="story-frame">

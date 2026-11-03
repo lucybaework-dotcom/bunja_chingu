@@ -673,9 +673,11 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
             notify(s, uid, '만남 확인이 2시간 안에 모두 모이지 않아 다시 확인해야 해요.', mt.roomId, now);
           }
         }
-        for (const [uid, other] of Object.entries(mt.confirmLoc)) {
-          if (uid !== cmd.actor && mt.confirmations[uid] === 'confirmed' && distanceM(loc, other) > P.radiusM)
-            fail(`먼저 확인한 참석자와 ${P.radiusM}m 넘게 떨어져 있어요. 함께 있을 때 눌러 주세요.`);
+        // 먼저 확인한 사람들의 가운데 지점과 비교한다 (여럿이 모이면 GPS 오차가 쌓여 한 쌍씩 비교하면 뒤에 누른 사람이 막힌다)
+        const prev = Object.entries(mt.confirmLoc).filter(([uid]) => uid !== cmd.actor && mt.confirmations[uid] === 'confirmed').map(([, l]) => l);
+        if (prev.length) {
+          const c = { lat: prev.reduce((t, l) => t + l.lat, 0) / prev.length, lng: prev.reduce((t, l) => t + l.lng, 0) / prev.length };
+          if (distanceM(loc, c) > P.radiusM) fail(`먼저 확인한 참석자들과 ${P.radiusM}m 넘게 떨어져 있어요. 함께 있을 때 눌러 주세요.`);
         }
         mt.confirmAt[cmd.actor] = now;
         mt.confirmLoc[cmd.actor] = { lat: loc.lat, lng: loc.lng, acc: loc.acc };

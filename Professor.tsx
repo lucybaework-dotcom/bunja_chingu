@@ -1,4 +1,4 @@
-// 벤 교수님: AI 원소 상담 캐릭터 (몰링크 오리지널). 표정만 바뀌는 단순한 SVG. 가운 주머니에 벤젠 고리 배지.
+// 벤 교수님: AI 원소 상담 캐릭터 (분자친구 오리지널). 표정만 바뀌는 단순한 SVG. 가운 주머니에 벤젠 고리 배지.
 import { BenSprite } from './BenSprite';
 
 export const PROF = { name: '벤 교수님', title: '유기화학 연구실', full: '벤 교수님의 원소 연구실' };

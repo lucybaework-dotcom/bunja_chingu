@@ -1,5 +1,6 @@
 // 서버 규칙 실행기. 저장소·인증은 deps로 주입받아 로컬 테스트와 실제 Edge Function이 같은 코드를 쓴다.
-import { apply, emptyState, normalize, remindMeetings, roomTitle, type Command } from './engine';
+import { apply, elementStats, emptyState, normalize, remindMeetings, roomTitle, type Command } from './engine';
+import { crowdedNote } from './balance';
 import { ADMIN_EMAILS } from './socialData';
 import { DomainError, type PushSub, type State } from './types';
 import { viewFor } from './view';
@@ -19,7 +20,7 @@ export interface Deps {
   /** 탈퇴한 사람의 로그인 계정 지우기 */
   deleteAuthUser?(uid: string): Promise<void>;
   /** AI 원소 상담 (없으면 꺼짐) */
-  ai?(history: AiTurn[], finish: boolean, onText?: (replySoFar: string) => void): Promise<AiReply>;
+  ai?(history: AiTurn[], finish: boolean, onText?: (replySoFar: string) => void, note?: string): Promise<AiReply>;
   /** 원하는 모임 → 분자 추천 (없으면 꺼짐) */
   aiRoom?(el: ElementId, request: string): Promise<RoomAdvice>;
   /** 응답을 먼저 보내고 뒤에서 마저 할 일 (알림 보내기 등). 없으면 기다렸다가 응답 */
@@ -33,7 +34,7 @@ export function pushesFor(before: State, after: State, actor: string): { uid: st
   const out: { uid: string; data: PushData }[] = [];
   const old = new Set(before.notifications.map((n) => n.id));
   for (const n of after.notifications) if (!old.has(n.id) && after.pushSubs[n.userId]?.length)
-    out.push({ uid: n.userId, data: { title: '몰링크', body: n.text, url: n.roomId ? `./#room-${n.roomId}` : './', tag: n.roomId ?? 'bunja' } });
+    out.push({ uid: n.userId, data: { title: '분자친구', body: n.text, url: n.roomId ? `./#room-${n.roomId}` : './', tag: n.roomId ?? 'bunja' } });
   const oldMsg = new Set(before.messages.map((m) => m.id));
   for (const m of after.messages) {
     if (oldMsg.has(m.id) || !m.senderId) continue;
@@ -119,7 +120,7 @@ async function sendPushes(deps: Deps, before: State, after: State, actor: string
 
 const kstDay = (t: number) => new Date(t + 9 * 3_600_000).toISOString().slice(0, 10);
 
-type AiPre = { history: AiTurn[]; finish: boolean } | { error: string; status: number };
+type AiPre = { history: AiTurn[]; finish: boolean; note: string } | { error: string; status: number };
 function aiPrecheck(uid: string, b: { history?: unknown; finish?: unknown }, s: State, now: number, deps: Deps): AiPre {
   if (!deps.ai) return { error: 'AI 상담이 아직 준비되지 않았어요. 질문 테스트로 찾아 주세요.', status: 503 };
   const u = s.users[uid];
@@ -130,7 +131,7 @@ function aiPrecheck(uid: string, b: { history?: unknown; finish?: unknown }, s: 
   const used = s.aiUsage?.[uid];
   if (used?.day === kstDay(now) && used.n >= AI_LIMITS.perDay) return { error: '오늘 AI 상담 횟수를 다 썼어요. 내일 다시 하거나 질문 테스트로 찾아 주세요.', status: 429 };
   const answers = history.filter((t) => t.role === 'user').length;
-  return { history, finish: b.finish === true || answers >= AI_LIMITS.forceFinishAfter };
+  return { history, finish: b.finish === true || answers >= AI_LIMITS.forceFinishAfter, note: crowdedNote(elementStats(s)) };
 }
 function aiApply(s: State, uid: string, reply: AiReply, now: number): State {
   const day = kstDay(now); const used = s.aiUsage?.[uid];
@@ -171,7 +172,7 @@ async function streamAi(uid: string, b: { history?: unknown; finish?: unknown },
     async start(ctrl) {
       const send = (o: object) => ctrl.enqueue(enc.encode(JSON.stringify(o) + '\n'));
       try {
-        const reply = await deps.ai!(pre.history, pre.finish, (text) => send({ t: 'delta', text }));
+        const reply = await deps.ai!(pre.history, pre.finish, (text) => send({ t: 'delta', text }), pre.note);
         let saved: State | null = null;
         for (let i = 0; i < 5 && !saved; i++) {
           const cur = await deps.load(); const t = deps.now();
@@ -206,7 +207,7 @@ async function runAi(uid: string, b: { history?: unknown; finish?: unknown }, s:
   if (n >= AI_LIMITS.perDay) return { error: '오늘 AI 상담 횟수를 다 썼어요. 내일 다시 하거나 질문 테스트로 찾아 주세요.', status: 429 };
   const answers = history.filter((t) => t.role === 'user').length;
   let reply: AiReply;
-  try { reply = cached ?? await deps.ai(history, b.finish === true || answers >= AI_LIMITS.forceFinishAfter); }
+  try { reply = cached ?? await deps.ai(history, b.finish === true || answers >= AI_LIMITS.forceFinishAfter, undefined, crowdedNote(elementStats(s))); }
   catch (e) {
     console.error('ai', e);
     return { error: aiErr(e), status: 502 };
@@ -233,6 +234,11 @@ export async function handleCron(secret: unknown, deps: Deps & { cronSecret?: st
 }
 
 export async function handle(token: string | null, body: unknown, deps: Deps): Promise<Reply> {
+  // 로그인 전 첫 이야기에서 원소 쏠림을 보려고 쓰는 공개 숫자 (원소별 인원만)
+  if ((body as { action?: unknown } | null)?.action === 'publicStats') {
+    const cur = await deps.load();
+    return { status: 200, body: { ok: true, stats: elementStats(normalize(cur?.state ?? emptyState())) } };
+  }
   if (!token) return { status: 401, body: { error: '로그인이 필요해요.' } };
   const user = await deps.getUser(token);
   if (!user) return { status: 401, body: { error: '로그인이 만료됐어요. 다시 로그인해 주세요.' } };

@@ -51,8 +51,8 @@ const deps: Deps = {
   },
   ...(Deno.env.get('GEMINI_API_KEY') ? { aiRoom: (el, req) => askGeminiRoom(Deno.env.get('GEMINI_API_KEY')!, el, req,
     Deno.env.get('GEMINI_MODEL') ? [Deno.env.get('GEMINI_MODEL')!, ...DEFAULT_MODELS] : DEFAULT_MODELS) } : {}),
-  ...(Deno.env.get('GEMINI_API_KEY') ? { ai: (h, finish, onText) => askGemini(Deno.env.get('GEMINI_API_KEY')!, h, finish,
-    Deno.env.get('GEMINI_MODEL') ? [Deno.env.get('GEMINI_MODEL')!, ...DEFAULT_MODELS] : DEFAULT_MODELS, fetch, onText) } : {}),
+  ...(Deno.env.get('GEMINI_API_KEY') ? { ai: (h, finish, onText, note) => askGemini(Deno.env.get('GEMINI_API_KEY')!, h, finish,
+    Deno.env.get('GEMINI_MODEL') ? [Deno.env.get('GEMINI_MODEL')!, ...DEFAULT_MODELS] : DEFAULT_MODELS, fetch, onText, note) } : {}),
   background: (p) => { const er = (globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } }).EdgeRuntime; if (er?.waitUntil) er.waitUntil(p); else void p; },
   ...(vapid() ? { sendPush: (sub, data) => sendWebPush(sub, data, vapid()!).catch((e) => { console.error('push', e); return 0; }) } : {}),
 };

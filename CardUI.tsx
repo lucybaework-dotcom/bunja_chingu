@@ -85,7 +85,7 @@ export function CardBackPattern() {
         <Atom el="O" size={44} /><span className="bond" style={{ width: 14, height: 4, background: 'currentColor' }} />
         <Atom el="H" size={30} />
       </div>
-      <span className="tcard-brand">몰링크</span>
+      <span className="tcard-brand">분자친구</span>
     </div>
   );
 }

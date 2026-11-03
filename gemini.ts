@@ -51,13 +51,13 @@ async function requestJson(key: string, system: string, contents: { role: string
 }
 
 export async function askGemini(key: string, history: AiTurn[], finish: boolean, models: string[] = DEFAULT_MODELS,
-  fetcher: typeof fetch = fetch, onText?: (replySoFar: string) => void): Promise<AiReply> {
+  fetcher: typeof fetch = fetch, onText?: (replySoFar: string) => void, note = ''): Promise<AiReply> {
   const contents = history.map((t) => ({ role: t.role === 'user' ? 'user' : 'model', parts: [{ text: t.text }] }));
   const answers = history.filter((t) => t.role === 'user').length;
   const nudge = finish ? '학생이 결과를 보고 싶어 해요. 지금 바로 마무리하고 원소 3개를 추천해 주세요.' : answers === 0 ? '대화를 시작해 주세요. 짧게 인사하고 첫 질문을 하나 해 주세요.' : '';
   if (nudge) contents.push({ role: 'user', parts: [{ text: `[앱 안내] ${nudge}` }] });
   let shown = '';
-  const text = await requestJson(key, systemPrompt(), contents, SCHEMA, models, fetcher,
+  const text = await requestJson(key, note ? `${systemPrompt()}\n\n${note}` : systemPrompt(), contents, SCHEMA, models, fetcher,
     onText ? (full) => { const p = partialReply(full); if (p !== null && p !== shown) { shown = p; onText(p); } } : undefined);
   return cleanReply(JSON.parse(text), answers);
 }

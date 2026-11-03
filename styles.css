@@ -491,3 +491,4 @@ img.ben-face { width: 100%; height: 100%; object-fit: cover; display: block; }
   .story-frame { height: calc(100vh - 48px); width: calc((100vh - 48px) * 9 / 16); margin: auto 0; border-radius: 28px; }
 }
 
+.balance-note { background: var(--accent-soft); border-radius: 12px; padding: 8px 12px; }

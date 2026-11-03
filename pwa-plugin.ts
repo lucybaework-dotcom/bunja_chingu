@@ -4,7 +4,7 @@ import { ICONS } from './pwa-icons';
 import { BEN_ART } from './ben-assets';
 
 const MANIFEST = {
-  name: '몰링크', short_name: '몰링크', description: '나를 닮은 원소로, 분자처럼 모여요',
+  name: '분자친구', short_name: '분자친구', description: '나를 닮은 원소로, 분자처럼 모여요',
   lang: 'ko', start_url: './', scope: './', display: 'standalone', orientation: 'portrait',
   background_color: '#eef5fb', theme_color: '#1b74b8',
   icons: [
@@ -14,7 +14,7 @@ const MANIFEST = {
   ],
 };
 
-const SW = `// 몰링크 서비스 워커: 화면 파일을 저장해 두고(새 버전은 네트워크 우선), 알림을 띄운다.
+const SW = `// 분자친구 서비스 워커: 화면 파일을 저장해 두고(새 버전은 네트워크 우선), 알림을 띄운다.
 const CACHE = 'bunja-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png'];
 self.addEventListener('install', (e) => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {})); });
@@ -33,7 +33,7 @@ self.addEventListener('fetch', (e) => {
   }));
 });
 self.addEventListener('push', (e) => {
-  let d = { title: '몰링크', body: '새 소식이 있어요.', url: './', tag: 'bunja' };
+  let d = { title: '분자친구', body: '새 소식이 있어요.', url: './', tag: 'bunja' };
   try { d = Object.assign(d, e.data ? e.data.json() : {}); } catch (_) {}
   e.waitUntil(self.registration.showNotification(d.title, { body: d.body, icon: './icon-192.png', badge: './icon-192.png', tag: d.tag, renotify: true, data: { url: d.url } }));
 });
@@ -61,7 +61,7 @@ export function pwaPlugin(): Plugin {
         '<link rel="apple-touch-icon" href="./apple-touch-icon.png" />',
         '<meta name="apple-mobile-web-app-capable" content="yes" />',
         '<meta name="mobile-web-app-capable" content="yes" />',
-        '<meta name="apple-mobile-web-app-title" content="몰링크" />',
+        '<meta name="apple-mobile-web-app-title" content="분자친구" />',
         '<meta name="apple-mobile-web-app-status-bar-style" content="default" />',
         `<meta name="build-id" content="${build}" />`,
       ].join('\n') + '\n</head>');
