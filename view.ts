@@ -1,9 +1,9 @@
 // 서버가 사용자 한 명에게 돌려주는 보기. 남의 채팅·알림·카드·리뷰·위치는 빼고, 볼 수 있는 프로필만 넣는다.
 import { isOnCampus } from './campus';
-import { buildProfile, canViewProfile, elementStats, hostPins, type PublicProfile } from './engine';
+import { buildProfile, canViewProfile, elementStats, hostPins, reactionOf, type PublicProfile, type Rating } from './engine';
 import type { State } from './types';
 
-export type View = State & { profiles: Record<string, PublicProfile>; isAdmin?: boolean; stats?: ReturnType<typeof elementStats> };
+export type View = State & { profiles: Record<string, PublicProfile>; isAdmin?: boolean; stats?: ReturnType<typeof elementStats>; ratings?: Record<string, Rating> };
 
 export function viewFor(s: State, uid: string, here?: { lat: number; lng: number } | null, now = Date.now()): View {
   const admin = s.admins.includes(uid);
@@ -44,6 +44,9 @@ export function viewFor(s: State, uid: string, here?: { lat: number; lng: number
     profiles,
     isAdmin: admin,
     stats: elementStats(s),
+    // 모집 중인 실험실 구성원의 별점 (들어가기 전에 볼 수 있게, 평균과 개수만)
+    ratings: Object.fromEntries([...new Set(s.members.filter((m) => m.leftAt === null && s.rooms[m.roomId] && s.rooms[m.roomId].closedAt === null).map((m) => m.userId))]
+      .map((id) => { const r = reactionOf(s, id); return [id, { stars: r.stars, reviews: r.reviews }]; })),
     aiUsage: s.aiUsage?.[uid] ? { [uid]: s.aiUsage[uid] } : {},
   };
 }

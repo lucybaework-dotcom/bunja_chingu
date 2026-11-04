@@ -24,6 +24,7 @@ export const REPORT_REASONS = [
 ] as const;
 
 /** 반응도: 50에서 시작. 받은 칭찬 1개당 +1, 확정된 신고 1건당 -5. 0~100 */
-export const REACTION = { base: 50, perPraise: 1, perUpheldReport: -5, minReviewsToShow: 3 };
+/** 반응도 = 함께 만난 사람들이 남긴 별점 평균. 3개 이상 모이면 공개, 확정된 신고 1건마다 0.5점 깎인다 */
+export const REACTION = { minReviewsToShow: 3, perUpheldReport: -0.5 };
 
 export const ADMIN_EMAILS = ['lucybae@kookmin.ac.kr'];

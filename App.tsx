@@ -14,12 +14,12 @@ import type { Backend, DispatchResult } from './backend';
 import { countsOf, exactMatches, moleculesWith, supersetCandidates, usableElements, vacancies } from './chemistry';
 import {
   activeMembers, canChat, getProfile, hasConflict, INTRO_MAX, isMember, isRecruitingOpen, joinableRoomsFor, openProposal, pendingMeeting,
-  recruitingCommitments, roomCounts, roomTitle, ROOM_NAME_MAX, TERMS_VERSION, waitingEntry, elementStats, type Command,
+  recruitingCommitments, roomCounts, roomTitle, ROOM_NAME_MAX, TERMS_VERSION, waitingEntry, elementStats, ratingOf, type Command,
 } from './engine';
 import type { MeetingRecord, Room, State } from './types';
 import { USABLE } from './molecules';
 import { CardCarousel, CardReveal, DexTile } from './CardUI';
-import { AdminView, NicknameInput, ProfileSheet, ReactionMeter, ReportForm, ReviewSheet, TagPicker } from './Social';
+import { AdminView, NicknameInput, ProfileSheet, RatingChip, ReactionHelp, ReactionMeter, ReportForm, ReviewSheet, Stars, TagPicker } from './Social';
 import Nearby from './Nearby';
 import { getLocation, getSimulated, isDemoGeo, setDemoGeo, setSimulated, watchLocation } from './geo';
 import { CAMPUS } from './campus';
@@ -641,7 +641,7 @@ function RoomCard({ room, compact }: { room: Room; compact?: boolean }) {
       {!compact && (
         <div className="stack-s">
           {mems.map((mm) => (
-            <div key={mm.userId} className="row small" style={{ flexWrap: 'nowrap' }}><Atom el={mm.elementSnapshot} size={20} /><span className="grow" style={{ overflowWrap: 'anywhere' }}>{s.users[mm.userId].intro}</span></div>
+            <div key={mm.userId} className="row small" style={{ flexWrap: 'nowrap' }}><Atom el={mm.elementSnapshot} size={20} /><span className="grow" style={{ overflowWrap: 'anywhere' }}>{s.users[mm.userId].intro}</span>{mm.userId !== viewer && <RatingChip {...ratingOf(s, mm.userId)} />}</div>
           ))}
         </div>
       )}
@@ -849,6 +849,7 @@ function RoomDetail({ id }: { id: string }) {
   const { s, viewer, run, go, openProfile } = useApp();
   const r = s.rooms[id];
   const [confirmLeave, setConfirmLeave] = useState<'' | 'leave' | 'close'>('');
+  const [help, setHelp] = useState(false);
   if (!r) return <p>실험실을 찾을 수 없어요.</p>;
   const m = moleculeById(r.targetMoleculeId)!;
   const mems = activeMembers(s, id);
@@ -902,6 +903,7 @@ function RoomDetail({ id }: { id: string }) {
                   {member && nickOf(s, viewer, mm.userId) && <span className="muted">{ELEMENTS[mm.elementSnapshot].name}</span>}
                   {mm.userId === r.hostId && <span className="chip">방장</span>}
                   {mm.userId === viewer && <span className="chip on">나</span>}
+                  {mm.userId !== viewer && <RatingChip {...ratingOf(s, mm.userId)} />}
                 </span>
                 <span className="small" style={{ overflowWrap: 'anywhere' }}>{s.users[mm.userId].intro}</span>
               </div>
@@ -920,6 +922,18 @@ function RoomDetail({ id }: { id: string }) {
         {myMem?.reason && (
           <div className="pair complement"><p className="small"><strong>자동 매칭 추천 이유</strong></p><p className="small">{myMem.reason.mood}</p><p className="small muted">{myMem.reason.behavior}</p></div>
         )}
+        {!member && isRecruitingOpen(r) && (() => {
+          const rated = mems.map((mm) => ratingOf(s, mm.userId)).filter((x) => x.stars !== null);
+          const avg = rated.length ? rated.reduce((t, x) => t + x.stars!, 0) / rated.length : null;
+          return (
+            <div className="join-rating">
+              {avg !== null ? <><Stars value={avg} size={18} /><span className="small">이 실험실 사람들의 평균 반응도 <strong>{avg.toFixed(1)}</strong> <span className="muted">({rated.length}명 기준)</span></span></>
+                : <span className="small muted">아직 별점이 쌓인 사람이 없어요. 모두 새 친구예요.</span>}
+              <button type="button" className="linkish small" onClick={() => setHelp(true)}>반응도란?</button>
+              {help && <ReactionHelp onClose={() => setHelp(false)} />}
+            </div>
+          );
+        })()}
         {!member && isRecruitingOpen(r) && (
           (vac[me.elementId!] ?? 0) > 0
             ? <button className="btn primary block" disabled={blocked.rooms.length > 0 || blocked.queued} onClick={join}>{ELEMENTS[me.elementId!].name} 자리로 합류</button>
@@ -1332,7 +1346,7 @@ function Profile() {
         </div>
       </div>
       <TitlePicker s={s} viewer={viewer} run={run} />
-      {mine && <div className="panel"><ReactionMeter score={mine.reaction.score} reviews={mine.reaction.reviews} /><button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => openProfile(viewer)}>내 프로필 보기</button></div>}
+      {mine && <div className="panel"><ReactionMeter stars={mine.reaction.stars} reviews={mine.reaction.reviews} /><button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => openProfile(viewer)}>내 프로필 보기</button></div>}
       <form className="panel" onSubmit={(e) => { e.preventDefault(); run({ type: 'updateProfile', actor: viewer, nickname: nick, tags }, '프로필을 저장했어요.'); }}>
         <NicknameInput id="nick-edit" value={nick} onChange={setNick} />
         <TagPicker value={tags} onChange={setTags} />
@@ -1501,7 +1515,7 @@ function DemoSheet({ onClose, setViewer, reset }: { onClose: () => void; setView
     if (!doneMeeting) return;
     const pool = ['kind', 'fun', 'again', 'punctual', 'caring', 'reply'];
     for (const a of doneMeeting.attendees) if (a.userId !== viewer && !s.reviews.some((x) => x.meetingId === doneMeeting.id && x.from === a.userId && x.to === viewer))
-      await run({ type: 'review', actor: a.userId, meetingId: doneMeeting.id, to: viewer, tags: [pool[Math.floor(Math.random() * pool.length)]] });
+      await run({ type: 'review', actor: a.userId, meetingId: doneMeeting.id, to: viewer, stars: 4 + Math.round(Math.random()), tags: [pool[Math.floor(Math.random() * pool.length)]] });
   };
   const [sim, setSim] = useState(getSimulated());
   const hostActs = () => r && r.hostId !== viewer && setViewer(r.hostId);

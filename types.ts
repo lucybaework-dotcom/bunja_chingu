@@ -79,7 +79,9 @@ export interface MeetingRecord {
   claimedAt?: number | null;
 }
 
-export interface Review { id: Id; meetingId: Id; from: Id; to: Id; tags: string[]; createdAt: number }
+export interface Review { id: Id; meetingId: Id; from: Id; to: Id; tags: string[]; createdAt: number;
+  /** 별점 1~5. 별점 도입 전 칭찬만 남긴 기록은 없음(5점으로 친다) */
+  stars?: number }
 export type ReportReason = 'rude' | 'noshow' | 'spam' | 'inappropriate' | 'other';
 export interface Report {
   id: Id; from: Id; target: Id; roomId: Id | null; reason: ReportReason; detail: string; createdAt: number;

@@ -19,7 +19,7 @@ export type Command =
   | { type: 'renameRoom'; actor: Id; roomId: Id; name: string; meetAt: number | null }
   | { type: 'claimCard'; actor: Id; recordId: Id }
   | { type: 'updateProfile'; actor: Id; nickname?: string; tags?: string[] }
-  | { type: 'review'; actor: Id; meetingId: Id; to: Id; tags: string[] }
+  | { type: 'review'; actor: Id; meetingId: Id; to: Id; stars: number; tags?: string[] }
   | { type: 'report'; actor: Id; target: Id; roomId?: Id | null; reason: ReportReason; detail: string; messageId?: Id | null }
   | { type: 'setVacancyAlert'; actor: Id; on: boolean }
   | { type: 'recordAdvice'; actor: Id; ranking: { element: ElementId; reason: string }[] }
@@ -142,16 +142,23 @@ export function canViewProfile(s: State, viewer: Id, target: Id): boolean {
     && s.members.some((o) => o.roomId === m.roomId && o.userId === target));
 }
 
-export interface Reaction { score: number | null; reviews: number; praise: Record<string, number> }
+/** 반응도: 별점 평균(소수 한 자리). 리뷰가 3개 미만이면 아직 비공개(null) */
+export interface Reaction { stars: number | null; reviews: number; praise: Record<string, number> }
 export function reactionOf(s: State, uid: Id): Reaction {
   const got = s.reviews.filter((r) => r.to === uid);
   const praise: Record<string, number> = {};
   for (const r of got) for (const t of r.tags) praise[t] = (praise[t] ?? 0) + 1;
-  const total = Object.values(praise).reduce((a, b) => a + b, 0);
   const upheld = s.reports.filter((r) => r.target === uid && r.status === 'upheld').length;
-  const raw = REACTION.base + total * REACTION.perPraise + upheld * REACTION.perUpheldReport;
-  return { score: got.length >= REACTION.minReviewsToShow ? Math.max(0, Math.min(100, raw)) : null, reviews: got.length, praise };
+  const avg = got.length ? got.reduce((t, r) => t + (r.stars ?? 5), 0) / got.length : 0;
+  const stars = Math.round(Math.max(1, Math.min(5, avg + upheld * REACTION.perUpheldReport)) * 10) / 10;
+  return { stars: got.length >= REACTION.minReviewsToShow ? stars : null, reviews: got.length, praise };
 }
+/** 실험실에 들어가기 전에 볼 수 있는 별점 요약 (누구든 볼 수 있음: 평균과 개수만) */
+export interface Rating { stars: number | null; reviews: number }
+export const ratingOf = (s: State & { ratings?: Record<Id, Rating> }, uid: Id): Rating => {
+  if (s.ratings) return s.ratings[uid] ?? { stars: null, reviews: 0 };
+  const r = reactionOf(s, uid); return { stars: r.stars, reviews: r.reviews };
+};
 
 /** 업적 계산에 쓰는 값: 받은 카드, 만남 수, 만난 원소, 남긴 반응 수 */
 export function achCtx(s: State, uid: Id): AchCtx {
@@ -737,10 +744,11 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
       if (!mt.attendees.some((a) => a.userId === cmd.actor) || !mt.attendees.some((a) => a.userId === cmd.to)) fail('함께 만난 사람에게만 반응을 남길 수 있어요.');
       if (cmd.to === cmd.actor) fail('나에게는 반응을 남길 수 없어요.');
       if (s.reviews.some((r) => r.meetingId === mt.id && r.from === cmd.actor && r.to === cmd.to)) fail('이미 반응을 남겼어요.');
-      const tags = [...new Set(cmd.tags)];
-      if (!tags.length || tags.length > PRAISE_MAX) fail(`칭찬은 1~${PRAISE_MAX}개 골라 주세요.`);
+      if (!Number.isInteger(cmd.stars) || cmd.stars < 1 || cmd.stars > 5) fail('별점을 1~5개 골라 주세요.');
+      const tags = [...new Set(cmd.tags ?? [])];
+      if (tags.length > PRAISE_MAX) fail(`칭찬은 ${PRAISE_MAX}개까지 고를 수 있어요.`);
       if (!tags.every((t) => PRAISE.some((p) => p.id === t))) fail('목록에 있는 칭찬만 고를 수 있어요.');
-      s.reviews.push({ id: nid(s, 'rv'), meetingId: mt.id, from: cmd.actor, to: cmd.to, tags, createdAt: now });
+      s.reviews.push({ id: nid(s, 'rv'), meetingId: mt.id, from: cmd.actor, to: cmd.to, stars: cmd.stars, tags, createdAt: now });
       break;
     }
     case 'report': {

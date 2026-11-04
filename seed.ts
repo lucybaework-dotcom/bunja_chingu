@@ -49,5 +49,8 @@ export function seedState(now: number): State {
   // 자동 매칭 대기 중인 질소 한 명
   run({ type: 'startAutoMatch', actor: ids[9] });
   void ids[7]; // 가상 7은 아무 방에도 없는 수소 (시연 도구에서 사용)
+  // 예전 만남에서 받은 별점 (시연용): 몇 명은 별점이 쌓여 있고, 나머지는 새 친구
+  const past: [number, number[]][] = [[0, [5, 5, 4, 5]], [12, [4, 4, 5]], [14, [5, 4, 4, 3, 5]], [3, [3, 4, 4]], [17, [5, 5, 5]]];
+  for (const [i, stars] of past) stars.forEach((n, k) => s.reviews.push({ id: `seed-rv-${i}-${k}`, meetingId: 'seed-past', from: `seed-past-${k}`, to: ids[i], stars: n, tags: n >= 5 ? ['kind'] : [], createdAt: now - 7 * 86_400_000 }));
   return s;
 }

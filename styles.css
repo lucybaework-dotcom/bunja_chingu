@@ -510,3 +510,16 @@ img.ben-face { width: 100%; height: 100%; object-fit: cover; display: block; }
 .host-menu summary::after { content: "▾"; margin-left: auto; color: var(--ink-2); }
 .host-menu[open] summary::after { content: "▴"; }
 .host-menu summary::-webkit-details-marker { display: none; }
+/* 별점 */
+.stars { display: inline-flex; gap: 1px; line-height: 1; letter-spacing: 0; }
+.stars span { color: var(--line); }
+.stars span.on { color: #f5b301; }
+.stars span.half { background: linear-gradient(90deg, #f5b301 50%, var(--line) 50%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.rating-chip { flex: none; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: #fff6d6; color: #8a6400; border: 1px solid #f1d27a; white-space: nowrap; }
+.rating-chip.new { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 600; }
+.star-pick { display: flex; align-items: center; gap: 4px; }
+.star-pick button { border: none; background: none; cursor: pointer; font-size: 36px; line-height: 1; color: var(--line); padding: 0 2px; transition: transform .15s; }
+.star-pick button.on { color: #f5b301; }
+.star-pick button:active { transform: scale(1.2); }
+.join-rating { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: #fffaf0; border: 1px solid #f1e2b8; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rating-chip { background: #3a3014; color: #f5d27a; border-color: #5a4a1c; } :root:not([data-theme="light"]) .join-rating { background: #2a2618; border-color: #4a4020; } }

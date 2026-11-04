@@ -108,29 +108,40 @@ describe('카드 받기', () => {
   });
 });
 
-describe('반응도 리뷰', () => {
-  it('만난 사람에게만 한 번, 3개 이상일 때 점수 공개, 서버 보기에서는 익명', () => {
+describe('반응도 별점', () => {
+  it('만난 사람에게만 한 번, 별점 1~5, 3개 이상일 때 평균 공개, 서버 보기에서는 익명', () => {
     const x = h(); const host = x.user('C'); const hs = [x.user('H'), x.user('H'), x.user('H'), x.user('H')];
     const r = x.room(host, 'ch4'); for (const u of hs) x.run({ type: 'joinRoom', actor: u, roomId: r });
     const m = x.run({ type: 'proposeMeeting', actor: host, roomId: r, attendeeIds: [host, ...hs] }).createdId!;
-    expect(x.err({ type: 'review', actor: hs[0], meetingId: m, to: host, tags: ['kind'] })).toMatch(/확인된 뒤/);
+    expect(x.err({ type: 'review', actor: hs[0], meetingId: m, to: host, stars: 5 })).toMatch(/확인된 뒤/);
     for (const u of [host, ...hs]) x.run({ type: 'respondMeeting', actor: u, meetingId: m, response: 'confirm', loc: at(0) });
-    x.run({ type: 'review', actor: hs[0], meetingId: m, to: host, tags: ['kind', 'fun'] });
-    expect(x.err({ type: 'review', actor: hs[0], meetingId: m, to: host, tags: ['kind'] })).toMatch(/이미/);
-    expect(x.err({ type: 'review', actor: host, meetingId: m, to: host, tags: ['kind'] })).toMatch(/나에게|함께/);
-    expect(x.err({ type: 'review', actor: hs[1], meetingId: m, to: host, tags: ['kind', 'fun', 'again', 'reply'] })).toMatch(/1~3/);
-    x.run({ type: 'review', actor: hs[1], meetingId: m, to: host, tags: ['kind'] });
-    expect(reactionOf(x.s, host).score).toBeNull();
-    x.run({ type: 'review', actor: hs[2], meetingId: m, to: host, tags: ['again'] });
-    expect(reactionOf(x.s, host)).toMatchObject({ score: 54, reviews: 3, praise: { kind: 2, fun: 1, again: 1 } });
+    expect(x.err({ type: 'review', actor: hs[0], meetingId: m, to: host, stars: 0 })).toMatch(/1~5/);
+    expect(x.err({ type: 'review', actor: hs[0], meetingId: m, to: host, stars: 6 })).toMatch(/1~5/);
+    x.run({ type: 'review', actor: hs[0], meetingId: m, to: host, stars: 5, tags: ['kind', 'fun'] });
+    expect(x.err({ type: 'review', actor: hs[0], meetingId: m, to: host, stars: 4 })).toMatch(/이미/);
+    expect(x.err({ type: 'review', actor: host, meetingId: m, to: host, stars: 5 })).toMatch(/나에게|함께/);
+    expect(x.err({ type: 'review', actor: hs[1], meetingId: m, to: host, stars: 4, tags: ['kind', 'fun', 'again', 'reply'] })).toMatch(/3개까지/);
+    x.run({ type: 'review', actor: hs[1], meetingId: m, to: host, stars: 4 });
+    expect(reactionOf(x.s, host).stars).toBeNull();
+    x.run({ type: 'review', actor: hs[2], meetingId: m, to: host, stars: 4, tags: ['again'] });
+    expect(reactionOf(x.s, host)).toMatchObject({ stars: 4.3, reviews: 3, praise: { kind: 1, fun: 1, again: 1 } });
     const v = viewFor(x.s, host, null, x.now);
-    expect(v.reviews).toEqual([]); // 받은 리뷰 원본(누가 남겼는지)은 안 보냄
-    expect(v.profiles[host].reaction.score).toBe(54);
+    expect(v.reviews).toEqual([]); // 받은 리뷰 원본(누가 몇 점 줬는지)은 안 보냄
+    expect(v.profiles[host].reaction.stars).toBe(4.3);
+  });
+  it('들어가기 전에도 모집 중인 실험실 사람의 별점 평균은 보인다', () => {
+    const x = h(); const host = x.user('O'); const out = x.user('H');
+    const r = x.room(host, 'h2o');
+    x.s.reviews.push(...[5, 4, 5].map((n, i) => ({ id: `rv${i}`, meetingId: 'old', from: `p${i}`, to: host, stars: n, tags: [], createdAt: 0 })));
+    const v = viewFor(x.s, out, null, x.now);
+    expect(v.ratings?.[host]).toEqual({ stars: 4.7, reviews: 3 });
+    expect(v.profiles[host]).toBeUndefined(); // 프로필은 여전히 같은 실험실일 때만
+    void r;
   });
 });
 
 describe('신고·차단·관리자', () => {
-  it('서로 다른 3명이 신고하면 자동 정지, 관리자 확정은 반응도 -5', () => {
+  it('서로 다른 3명이 신고하면 자동 정지, 관리자 확정은 별점 -0.5', () => {
     const x = h(); const bad = x.user('H'), r1 = x.user('O'), r2 = x.user('O'), r3 = x.user('O');
     const admin = x.run({ type: 'createUser', intro: '관리', makeMe: true, consentVersion: TERMS_VERSION }).createdId!;
     x.run({ type: 'report', actor: r1, target: bad, reason: 'rude', detail: '' });

@@ -22,16 +22,51 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-/** 반응도 막대 */
-export function ReactionMeter({ score, reviews }: { score: number | null; reviews: number }) {
-  if (score === null) return <p className="small muted">반응도 측정 중 ({reviews}/{REACTION.minReviewsToShow})</p>;
-  const level = score >= 70 ? '아주 활발해요' : score >= 55 ? '활발해요' : score >= 45 ? '보통이에요' : '조심스러워요';
+/** 별 다섯 개 (소수점은 반만 채움) */
+export function Stars({ value, size = 16 }: { value: number; size?: number }) {
   return (
-    <div className="stack-s" style={{ gap: 4 }}>
-      <div className="row between"><span className="small"><strong>반응도 {score}</strong> · {level}</span><span className="small muted mono">반응 {reviews}개</span></div>
-      <div className="meter" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={score} aria-label="반응도"><div style={{ width: `${score}%` }} /></div>
+    <span className="stars" style={{ fontSize: size }} aria-hidden="true">
+      {[1, 2, 3, 4, 5].map((i) => <span key={i} className={value >= i - 0.25 ? 'on' : value >= i - 0.75 ? 'half' : ''}>★</span>)}
+    </span>
+  );
+}
+
+/** 반응도가 뭔지 알려 주는 작은 창 */
+export function ReactionHelp({ onClose }: { onClose: () => void }) {
+  return (
+    <Sheet title="반응도가 뭐예요?" onClose={onClose}>
+      <div className="row" style={{ gap: 8 }}><Stars value={4.5} size={22} /><strong>4.5</strong><span className="small muted">함께 만난 사람들이 남긴 별점 평균</span></div>
+      <ul className="plain stack-s small">
+        <li><strong>실제로 만난 사람</strong>끼리만 별점을 남길 수 있어요. 만남 확인이 끝나야 열려요.</li>
+        <li>누가 몇 점을 줬는지는 <strong>아무도 몰라요</strong>. 평균만 보여요.</li>
+        <li>별점이 <strong>{REACTION.minReviewsToShow}개 이상</strong> 모여야 공개돼요. 그전엔 “새 친구”로 보여요.</li>
+        <li>신고가 관리자에게 확인되면 별점이 내려가요.</li>
+        <li>실험실에 들어가기 전에 이미 있는 사람들의 별점을 볼 수 있어요.</li>
+      </ul>
+      <p className="small muted">사람을 평가하는 점수가 아니라, 함께 만났을 때의 경험을 나누는 거예요.</p>
+    </Sheet>
+  );
+}
+
+/** 반응도 (별점 평균) */
+export function ReactionMeter({ stars, reviews }: { stars: number | null; reviews: number }) {
+  const [help, setHelp] = useState(false);
+  return (
+    <div className="row between" style={{ flexWrap: 'nowrap' }}>
+      {stars === null
+        ? <span className="small muted">반응도 · 별점 모으는 중 ({reviews}/{REACTION.minReviewsToShow})</span>
+        : <span className="row" style={{ gap: 8 }}><span className="small" style={{ fontWeight: 700 }}>반응도</span><Stars value={stars} size={18} /><strong>{stars.toFixed(1)}</strong><span className="small muted">({reviews})</span></span>}
+      <button type="button" className="linkish small" onClick={() => setHelp(true)}>반응도란?</button>
+      {help && <ReactionHelp onClose={() => setHelp(false)} />}
     </div>
   );
+}
+
+/** 실험실 목록·상세에서 쓰는 짧은 별점 표시 */
+export function RatingChip({ stars, reviews }: { stars: number | null; reviews: number }) {
+  return stars === null
+    ? <span className="rating-chip new" title={`별점 ${reviews}개`}>새 친구</span>
+    : <span className="rating-chip" aria-label={`별점 ${stars.toFixed(1)}, ${reviews}개`}>★ {stars.toFixed(1)}</span>;
 }
 
 export function TagPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
@@ -78,8 +113,8 @@ export function ProfileSheet({ s, viewer, uid, run, onClose, roomId }: { s: Stat
             </div>
           </div>
           <div className="panel">
-            <ReactionMeter score={p.reaction.score} reviews={p.reaction.reviews} />
-            {p.reaction.score !== null && (
+            <ReactionMeter stars={p.reaction.stars} reviews={p.reaction.reviews} />
+            {p.reaction.stars !== null && (
               <div className="row" style={{ gap: 6 }}>
                 {PRAISE.filter((x) => p.reaction.praise[x.id]).map((x) => <span key={x.id} className="chip">{x.label} <span className="mono">{p.reaction.praise[x.id]}</span></span>)}
               </div>
@@ -140,37 +175,48 @@ export function ReportForm({ run, viewer, target, roomId, name, onDone, messageI
   );
 }
 
-/** 만남이 확인된 뒤 함께한 사람에게 칭찬을 남긴다 (익명) */
+/** 만남이 확인된 뒤 함께한 사람에게 별점(필수)과 칭찬(선택)을 남긴다 (익명) */
 export function ReviewSheet({ s, viewer, meetingId, run, onClose }: { s: State; viewer: string; meetingId: string; run: Run; onClose: () => void }) {
   const mt = s.meetings.find((m) => m.id === meetingId);
   const others = mt?.attendees.filter((a) => a.userId !== viewer) ?? [];
   const done = (to: string) => s.reviews.some((r) => r.meetingId === meetingId && r.from === viewer && r.to === to);
   const [cur, setCur] = useState<string | null>(others.find((o) => !done(o.userId))?.userId ?? null);
   const [tags, setTags] = useState<string[]>([]);
+  const [stars, setStars] = useState(0);
+  const [help, setHelp] = useState(false);
   const name = (uid: string) => getProfile(s, viewer, uid)?.nickname || '함께한 친구';
+  const LABEL = ['', '아쉬웠어요', '그저 그랬어요', '괜찮았어요', '좋았어요', '최고였어요'];
   return (
-    <Sheet title="반응 남기기" onClose={onClose}>
-      <p className="small muted">익명이에요.</p>
+    <Sheet title="별점 남기기" onClose={onClose}>
+      <div className="row between"><p className="small muted">익명이에요. 평균만 보여요.</p><button type="button" className="linkish small" onClick={() => setHelp(true)}>반응도란?</button></div>
       <div className="stack-s">
         {others.map((o) => (
-          <button key={o.userId} type="button" className={`option${cur === o.userId ? ' sel' : ''}`} disabled={done(o.userId)} onClick={() => { setCur(o.userId); setTags([]); }}>
+          <button key={o.userId} type="button" className={`option${cur === o.userId ? ' sel' : ''}`} disabled={done(o.userId)} onClick={() => { setCur(o.userId); setTags([]); setStars(0); }}>
             <span className="row"><Atom el={o.element} size={24} /><span className="grow">{name(o.userId)}</span>{done(o.userId) && <span className="chip ok">남김</span>}</span>
           </button>
         ))}
       </div>
       {cur && !done(cur) && (
-        <div className="panel">
-          <h3>{name(cur)}님은 어땠나요? <span className="small muted">(최대 {PRAISE_MAX}개)</span></h3>
+        <div className="panel" style={{ gap: 10 }}>
+          <h3>{name(cur)}님과의 만남은 어땠나요?</h3>
+          <div className="star-pick" role="radiogroup" aria-label="별점">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button key={n} type="button" role="radio" aria-checked={stars === n} aria-label={`${n}점`} className={stars >= n ? 'on' : ''} onClick={() => setStars(n)}>★</button>
+            ))}
+            <span className="small muted">{LABEL[stars]}</span>
+          </div>
+          <span className="small muted">좋았던 점 (선택, 최대 {PRAISE_MAX}개)</span>
           <div className="row" style={{ gap: 6 }}>
             {PRAISE.map((p) => { const on = tags.includes(p.id); return <button key={p.id} type="button" className={`chip pick${on ? ' on' : ''}`} aria-pressed={on} disabled={!on && tags.length >= PRAISE_MAX} onClick={() => setTags(on ? tags.filter((x) => x !== p.id) : [...tags, p.id])}>{p.label}</button>; })}
           </div>
-          <button className="btn primary block" disabled={!tags.length} onClick={async () => {
-            const r = await run({ type: 'review', actor: viewer, meetingId, to: cur, tags }, '반응을 남겼어요.');
-            if (r.ok) { setTags([]); setCur(others.find((o) => o.userId !== cur && !done(o.userId))?.userId ?? null); }
-          }}>남기기</button>
+          <button className="btn primary block" disabled={!stars} onClick={async () => {
+            const r = await run({ type: 'review', actor: viewer, meetingId, to: cur, stars, tags }, '별점을 남겼어요.');
+            if (r.ok) { setTags([]); setStars(0); setCur(others.find((o) => o.userId !== cur && !done(o.userId))?.userId ?? null); }
+          }}>{stars ? `별 ${stars}개 남기기` : '별을 눌러 주세요'}</button>
         </div>
       )}
-      {others.length > 0 && others.every((o) => done(o.userId)) && <p className="small">모두에게 반응을 남겼어요. 고마워요!</p>}
+      {others.length > 0 && others.every((o) => done(o.userId)) && <p className="small">모두에게 별점을 남겼어요. 고마워요!</p>}
+      {help && <ReactionHelp onClose={() => setHelp(false)} />}
     </Sheet>
   );
 }
