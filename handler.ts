@@ -5,7 +5,7 @@ import { ADMIN_EMAILS } from './socialData';
 import { DomainError, type PushSub, type State } from './types';
 import { viewFor } from './view';
 import { AI_LIMITS, cleanHistory, type AiReply, type AiTurn } from './advisor';
-import { ROOM_REQ_MAX, type RoomAdvice } from './roomAdvisor';
+import { ROOM_REQ_MAX, demoRoomAdvice, type RoomAdvice } from './roomAdvisor';
 import type { ElementId } from './molecules';
 
 export interface Deps {
@@ -152,7 +152,10 @@ async function roomAi(uid: string, request: unknown, here: { lat: number; lng: n
   const used = s.aiUsage?.[uid];
   if (used?.day === kstDay(now) && used.n >= AI_LIMITS.perDay) return { status: 429, body: { error: '오늘 교수님 추천 횟수를 다 썼어요.' } };
   let advice: RoomAdvice;
-  try { advice = await deps.aiRoom(u.elementId, text); } catch (e) { console.error('aiRoom', e); return { status: 502, body: { error: aiErr(e) } }; }
+  try { advice = await deps.aiRoom(u.elementId, text); } catch (e) {
+    console.error('aiRoom', e);
+    advice = demoRoomAdvice(u.elementId, text); // AI가 안 되면 인원과 궁합으로라도 추천
+  }
   for (let i = 0; i < 5; i++) {
     const cur = await deps.load(); const t = deps.now(); const st = normalize(cur?.state ?? emptyState());
     const day = kstDay(t); const c = st.aiUsage?.[uid];

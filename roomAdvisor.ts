@@ -34,11 +34,14 @@ export function roomSystemPrompt(el: ElementId): string {
 /** 모델 답 검사: 내 원소가 들어가는 분자만, 최대 3개 */
 export function cleanRoomAdvice(raw: unknown, el: ElementId): RoomAdvice {
   const o = (raw ?? {}) as { reply?: unknown; picks?: unknown; roomName?: unknown };
-  const ok = new Set(moleculesWith(el).map((m) => m.id));
+  // 모델이 id 대신 화학식(H2O, H₂O)이나 이름(물)을 써도 알아듣는다
+  const key = (x: string) => x.normalize('NFKC').toLowerCase().replace(/[\s·()\[\]{}_-]/g, '');
+  const lookup = new Map<string, string>();
+  for (const m of moleculesWith(el)) for (const k of [m.id, m.formula, m.name]) lookup.set(key(k), m.id);
   const seen = new Set<string>(); const picks: RoomPick[] = [];
   if (Array.isArray(o.picks)) for (const p of o.picks as { molecule?: unknown; reason?: unknown }[]) {
-    const id = typeof p?.molecule === 'string' ? p.molecule.trim() : '';
-    if (!ok.has(id) || seen.has(id)) continue;
+    const id = typeof p?.molecule === 'string' ? lookup.get(key(p.molecule)) ?? '' : '';
+    if (!id || seen.has(id)) continue;
     seen.add(id); picks.push({ molecule: id, reason: typeof p.reason === 'string' ? p.reason.trim().slice(0, 80) : '' });
     if (picks.length === 3) break;
   }

@@ -72,8 +72,13 @@ const ROOM_SCHEMA = {
 };
 /** 원하는 모임 → 분자 추천 */
 export async function askGeminiRoom(key: string, el: ElementId, request: string, models: string[] = DEFAULT_MODELS, fetcher: typeof fetch = fetch): Promise<RoomAdvice> {
-  const text = await requestJson(key, roomSystemPrompt(el), [{ role: 'user', parts: [{ text: `원하는 모임: ${request}` }] }], ROOM_SCHEMA, models, fetcher, undefined, 600);
-  return cleanRoomAdvice(JSON.parse(text), el);
+  // 답이 잘리거나 엉뚱하면 한 번 더 묻는다
+  let last: unknown;
+  for (let i = 0; i < 2; i++) {
+    const text = await requestJson(key, roomSystemPrompt(el), [{ role: 'user', parts: [{ text: `원하는 모임: ${request}` }] }], ROOM_SCHEMA, models, fetcher, undefined, 1500);
+    try { return cleanRoomAdvice(JSON.parse(text), el); } catch (e) { last = e; console.error('aiRoom parse', String(e), text.slice(0, 300)); }
+  }
+  throw last;
 }
 
 type Chunk = { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };

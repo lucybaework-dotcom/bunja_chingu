@@ -45,4 +45,30 @@ describe('교수님 분자 추천', () => {
     expect(sys).toContain('co2:'); expect(sys).not.toContain('nacl:');
     expect(r.picks[0].molecule).toBe('co2'); expect(r.roomName).toBe('수다방');
   });
+  it('화학식·이름으로 답해도 알아듣고, AI가 실패하면 기본 추천으로', async () => {
+    const r = cleanRoomAdvice({ picks: [{ molecule: 'H2O', reason: 'a' }, { molecule: '물', reason: 'dup' }, { molecule: 'H₂', reason: 'b' }] }, 'H');
+    expect(r.picks.map((p) => p.molecule)).toEqual(['h2o', 'h2']);
+    let row: { version: number; state: State } | null = null;
+    const deps: Deps = {
+      getUser: async () => ({ id: 'A', email: 'a@x.com' }), load: async () => (row ? structuredClone(row) : null),
+      save: async (p, n) => { if ((row?.version ?? null) !== p) return false; row = { version: (p ?? 0) + 1, state: structuredClone(n) }; return true; },
+      bump: async () => {}, now: () => Date.UTC(2026, 10, 2),
+      aiRoom: async () => { throw new Error('gemini 500'); },
+    };
+    const d = (cmd: object) => handle('t', { action: 'dispatch', cmd }, deps);
+    await d({ type: 'createUser', intro: '', consentVersion: TERMS_VERSION });
+    await d({ type: 'updateProfile', nickname: '테스터' }); await d({ type: 'lockElement', elementId: 'O', acknowledged: true });
+    const res = await handle('t', { action: 'aiRoom', request: '시험공부 같이 할 사람' }, deps);
+    expect(res.status).toBe(200); expect((res.body.room as { picks: unknown[] }).picks.length).toBeGreaterThan(0);
+  });
+  it('잘린 답이면 한 번 더 묻는다', async () => {
+    let n = 0;
+    const fetcher = (async () => {
+      n++;
+      const text = n === 1 ? '{"reply":"홍홍~","picks":[{"molec' : JSON.stringify({ reply: 'ok', roomName: '공부방', picks: [{ molecule: 'co2', reason: 'r' }] });
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }));
+    }) as typeof fetch;
+    const r = await askGeminiRoom('K', 'C', '공부', ['m'], fetcher);
+    expect(n).toBe(2); expect(r.picks[0].molecule).toBe('co2');
+  });
 });
