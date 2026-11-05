@@ -21,7 +21,7 @@ import { USABLE } from './molecules';
 import { CardCarousel, CardReveal, DexTile } from './CardUI';
 import { AdminView, NicknameInput, ProfileSheet, RatingChip, ReactionHelp, ReactionMeter, ReportForm, ReviewSheet, Stars, TagPicker } from './Social';
 import Nearby from './Nearby';
-import { getLocation, getSimulated, isDemoGeo, setDemoGeo, setSimulated, watchLocation } from './geo';
+import { getSimulated, isDemoGeo, setDemoGeo, setSimulated, watchLocation, getBestLocation } from './geo';
 import { CAMPUS } from './campus';
 import { PERIODIC, PT_GROUPS, PT_PERIODS } from './periodic';
 import { elementColor } from './colors';
@@ -1081,7 +1081,7 @@ function MeetingPanel({ room }: { room: Room }) {
               <button className="btn grow" onClick={() => run({ type: 'respondMeeting', actor: viewer, meetingId: pm.id, response: 'reject' }, '방장에게 수정을 요청했어요.')}>목록이 달라요</button>
               <button className="btn primary grow" disabled={locating} onClick={async () => {
                 setLocating(true);
-                const g = await getLocation();
+                const g = await getBestLocation();
                 setLocating(false);
                 if (!g.ok) { await run({ type: 'respondMeeting', actor: viewer, meetingId: pm.id, response: 'confirm', loc: null }); return; }
                 await run({ type: 'respondMeeting', actor: viewer, meetingId: pm.id, response: 'confirm', loc: g.loc }, '만남을 확인했어요.');

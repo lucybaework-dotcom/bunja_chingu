@@ -108,7 +108,7 @@ export interface Config {
   /** 투표 응답 기한 (미정 사항 → 설정값) */
   proposalHours: number;
   /** 만남 확인 위치 규칙 */
-  meetingProximity: { required: boolean; radiusM: number; windowMs: number; maxAccuracyM: number };
+  meetingProximity: { required: boolean; radiusM: number; windowMs: number; maxAccuracyM: number; maxSlackM?: number };
   /** 이만큼 다른 사람에게 신고되면 자동 일시 정지 */
   suspendAfterReports: number;
 }

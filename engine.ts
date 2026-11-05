@@ -64,7 +64,7 @@ const DAY = 86_400_000, HOUR = 3_600_000;
 
 export const DEFAULT_CONFIG: State['config'] = {
   defaultRecruitDays: 3, proposalHours: 24,
-  meetingProximity: { required: true, radiusM: 100, windowMs: 2 * HOUR, maxAccuracyM: 150 },
+  meetingProximity: { required: true, radiusM: 100, windowMs: 2 * HOUR, maxAccuracyM: 150, maxSlackM: 300 },
   suspendAfterReports: 3,
 };
 
@@ -684,7 +684,11 @@ export function apply(prev: State, cmd: Command, now: number): ApplyResult {
         const prev = Object.entries(mt.confirmLoc).filter(([uid]) => uid !== cmd.actor && mt.confirmations[uid] === 'confirmed').map(([, l]) => l);
         if (prev.length) {
           const c = { lat: prev.reduce((t, l) => t + l.lat, 0) / prev.length, lng: prev.reduce((t, l) => t + l.lng, 0) / prev.length };
-          if (distanceM(loc, c) > P.radiusM) fail(`먼저 확인한 참석자들과 ${P.radiusM}m 넘게 떨어져 있어요. 함께 있을 때 눌러 주세요.`);
+          // GPS 오차만큼 여유를 준다 (실내·노트북은 같은 자리에서도 수십~백 m씩 튄다). 그래도 최대 maxSlackM까지만
+          const prevAcc = prev.reduce((t, l) => t + (l.acc ?? 0), 0) / prev.length;
+          const allow = Math.min(P.radiusM + loc.acc + prevAcc, P.maxSlackM ?? 300);
+          const d = distanceM(loc, c);
+          if (d > allow) fail(`먼저 확인한 참석자들과 약 ${Math.round(d)}m 떨어져 있어요. 함께 있을 때 다시 눌러 주세요.`);
         }
         mt.confirmAt[cmd.actor] = now;
         mt.confirmLoc[cmd.actor] = { lat: loc.lat, lng: loc.lng, acc: loc.acc };

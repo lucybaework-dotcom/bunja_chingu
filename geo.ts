@@ -57,3 +57,26 @@ export function watchLocation(cb: (r: GeoResult) => void): () => void {
   );
   return () => navigator.geolocation.clearWatch(id);
 }
+
+/** 만남 확인용: 몇 초 동안 새 위치를 여러 번 받아 가장 정확한 것을 쓴다 (실내에서 튀는 값 줄이기) */
+export function getBestLocation(ms = 4000): Promise<GeoResult> {
+  if (demo || !('geolocation' in navigator)) return getLocation();
+  return new Promise((resolve) => {
+    let best: GeoPoint | null = null; let err: string | null = null; let done = false;
+    const finish = () => {
+      if (done) return; done = true; navigator.geolocation.clearWatch(id); clearTimeout(t);
+      if (best) { last = best; subs.forEach((f) => f()); resolve({ ok: true, loc: best }); }
+      else resolve({ ok: false, error: err ?? MSG[3] });
+    };
+    const id = navigator.geolocation.watchPosition(
+      (p) => {
+        const g = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy };
+        if (!best || g.acc < best.acc) best = g;
+        if (g.acc <= 25) finish();
+      },
+      (e) => { err = MSG[e.code] ?? '위치를 가져오지 못했어요.'; if (e.code === 1) finish(); },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15_000 },
+    );
+    const t = setTimeout(() => { if (best) finish(); else setTimeout(finish, 11_000); }, ms);
+  });
+}

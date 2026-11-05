@@ -80,6 +80,13 @@ describe('만남 확인 100m 규칙', () => {
     expect(mt.status).toBe('confirmed');
     expect(mt.confirmLoc).toBeUndefined(); // 확정 뒤 위치는 지운다
   });
+  it('GPS 오차가 크면 그만큼 여유를 주되 300m까지만', () => {
+    const { x, a, b, m } = metH2();
+    x.run({ type: 'respondMeeting', actor: a, meetingId: m, response: 'confirm', loc: at(0, 0, 90) });
+    expect(x.err({ type: 'respondMeeting', actor: b, meetingId: m, response: 'confirm', loc: at(320, 0, 140) })).toMatch(/약 3\d\dm/);
+    x.run({ type: 'respondMeeting', actor: b, meetingId: m, response: 'confirm', loc: at(220, 0, 80) }); // 같은 자리여도 실내에선 이만큼 튄다
+    expect(x.s.meetings.find((y) => y.id === m)!.status).toBe('confirmed');
+  });
   it('2시간이 지난 확인은 다시 받는다', () => {
     const { x, a, b, m } = metH2();
     x.run({ type: 'respondMeeting', actor: a, meetingId: m, response: 'confirm', loc: at(0) });
