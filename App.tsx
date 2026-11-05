@@ -1,7 +1,7 @@
 import { Achievements, ElementStats, guideSeen, GuideSheet, markGuideSeen, TitlePicker, VacancyToggle } from './Extras2';
 import { ConsentChecks, DeleteAccount, DocSheet, InstallCard, PlaceCard, PushToggle, TermsUpdateCard } from './Extras';
 import { j, josaOf } from './josa';
-import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ELEMENTS, METAPHOR_NOTICE, pairContent } from './elements';
 import { Professor, PROF } from './Professor';
 import { balancePick, type Stats } from './balance';
@@ -521,11 +521,16 @@ function Home() {
   const { pending } = myCards(s, viewer);
   const [nick, setNick] = useState('');
   const [make, setMake] = useState(false);
+  const [searching, setSearching] = useState(false);
   const auto = async () => {
-    const r = await run({ type: 'startAutoMatch', actor: viewer });
+    // 바로 맞는 방이 있어도 '찾는 중' 화면을 1초쯤 보여 주고 넘어간다
+    setMake(false); setSearching(true);
+    const [r] = await Promise.all([run({ type: 'startAutoMatch', actor: viewer }), new Promise((ok) => setTimeout(ok, 1000))]);
+    setSearching(false);
     if (!r.ok) return;
     if (r.info === 'queued') go({ k: 'auto' }); else go({ k: 'room', id: r.createdId! });
   };
+  if (searching) return <Searching el={el} />;
   return (
     <div className="stack" style={{ gap: 18 }}>
       <div className="panel" style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
@@ -834,12 +839,20 @@ function AutoMatch() {
   );
   const waiting = s.queue.filter((x) => x.status === 'waiting').length;
   return (
-    <div className="stack" style={{ gap: 20, alignItems: 'center', textAlign: 'center', paddingTop: 24 }}>
+    <Searching el={el}>
+      <div className="row small muted" style={{ justifyContent: 'center' }}><span className="mono">대기 {waiting}명</span><span>·</span><span>{fmtTime(q.enteredAt)}부터</span></div>
+      <button className="btn danger" onClick={async () => { const r = await run({ type: 'cancelAutoMatch', actor: viewer }, '매칭을 취소했어요.'); if (r.ok) go({ k: 'home' }); }}>매칭 취소</button>
+    </Searching>
+  );
+}
+
+function Searching({ el, children }: { el: ElementId; children?: ReactNode }) {
+  return (
+    <div className="stack" style={{ gap: 20, alignItems: 'center', textAlign: 'center', paddingTop: 24 }} aria-live="polite">
       <span className="pulse"><Atom el={el} size={88} /></span>
       <h1>결합할 원자를 찾는 중</h1>
       <p className="muted">{ELEMENTS[el].name} 자리가 맞는 분자가 모이면 알려 드려요.</p>
-      <div className="row small muted" style={{ justifyContent: 'center' }}><span className="mono">대기 {waiting}명</span><span>·</span><span>{fmtTime(q.enteredAt)}부터</span></div>
-      <button className="btn danger" onClick={async () => { const r = await run({ type: 'cancelAutoMatch', actor: viewer }, '매칭을 취소했어요.'); if (r.ok) go({ k: 'home' }); }}>매칭 취소</button>
+      {children}
     </div>
   );
 }
